@@ -3,30 +3,37 @@ from tkinter import ttk
 
 # --- CONFIGURAÇÃO DE TEXTOS E ORDEM ---
 LABELS_AMIGAVEIS = {
-    # --- GRUPO 1: Solicitante ---
-    "NOME_EMPRESA_SOLICITANTE": "Razão Social (Cliente)",
-    "CNPJ_CPF_SOLICITANTE": "CNPJ / CPF",
-    "IE_SOLICITANTE": "Inscrição Estadual",
-    "EMAIL_SOLICITANTE": "E-mail de Contato",
-    "CELULAR_SOLICITANTE": "Telefone / Celular",
-    "ENDERECO_SOLICITANTE": "Endereço Completo",
-    "BAIRRO_SOLICITANTE": "Bairro",
-    "CIDADE_SOLICITANTE": "Cidade / Município",
-    "CEP_SOLICITANTE": "CEP",
-    
-    # --- GRUPO 2: Faturamento ---
-    "NOME_EMPRESA_CONTRATANTE": "Razão Social (Faturamento)",
-    "CNPJ_CPF_CONTRATANTE": "CNPJ / CPF (Pagador)",
-    "EMAIL_CONTRATANTE": "E-mail Financeiro",
-    "ENDERECO_CONTRATANTE": "Endereço de Cobrança",
-    
-    # --- GRUPO 3: Outros ---
-    "DATA_PROPOSTA": "Data da Proposta",
-    "VALIDADE_PROPOSTA": "Validade (dias)",
+    # --- GRUPO 1: Dados do Projeto ---
+    "NUMERO_PROJETO": "Número Projeto",
+    "TIPO_OBRA": "Tipo de Obra",
+    "DESCRICAO_DA_OBRA": "Descrição da Obra",
+    "ENDERECO_DA_OBRA": "Endereço da Obra",
     "ARQUIVOS_RECEBIDOS": "Arquivos Recebidos",
-    "PRAZO_ENTREGA": "Prazo de Entrega",
-    "OBSERVACOES": "Observações Gerais"
-    # Note que tirei CONDICOES_PAGAMENTO daqui pois ele terá label próprio lá em cima
+    "RESPONSAVEL_TECNICO":  "Responsável Técnico",
+    "CREA": "CREA",
+
+    # --- GRUPO 2: Dados do Solicitante ---
+    "NOME_EMPRESA_SOLICITANTE": "Nome / Empresa",
+    "CNPJ_CPF_SOLICITANTE": "CNPJ/CPF",
+    "IE_SOLICITANTE": "IE",
+    "ENDERECO_SOLICITANTE": " Endereço",
+    "BAIRRO_SOLICITANTE": "Bairro",
+    "CIDADE_SOLICITANTE": "Cidade",
+    "CEP_SOLICITANTE": "CEP",
+    "EMAIL_SOLICITANTE": "E-mail",
+    "CELULAR_SOLICITANTE": "Celular",
+    
+    # --- GRUPO 3: Dados do faturamento ---
+    "NOME_EMPRESA_CONTRATANTE": "Nome / Empresa",
+    "CNPJ_CPF_CONTRATANTE": "CNPJ/CPF",
+    "ENDERECO_CONTRATANTE":  "Endereço", 
+    "BAIRRO_CONTRATANTE": "Bairro",
+    "CIDADE_CONTRATANTE": "Cidade",
+    "CEP_CONTRATANTE": "CEP",
+    "EMAIL_CONTRATANTE": "E-mail", 
+    "CELULAR_CONTRATANTE": "Celular", 
+    "ENDERECO_ENTREGA": "Endereço de entrega",
+
 }
 
 def formatar_label(texto_cru):
@@ -43,7 +50,6 @@ def obter_prioridade(campo):
 
 # --- JANELA PRINCIPAL ATUALIZADA ---
 
-# Note o novo argumento: valor_pagamento_inicial
 def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, valor_frete_inicial, valor_pagamento_inicial):
     win = tk.Toplevel(parent)
     win.title("Conferência Geral dos Dados")
@@ -55,7 +61,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     widgets_servicos = {}
     
     var_frete = tk.StringVar(value=valor_frete_inicial)
-    var_pagamento = tk.StringVar(value=valor_pagamento_inicial) # Variável nova
+    var_pagamento = tk.StringVar(value=valor_pagamento_inicial) 
 
     # --- CABEÇALHO ---
     f_header = ttk.Frame(win, padding=15)
@@ -104,16 +110,13 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     opcoes_frete = ["CIF - Por conta do destinatário", "FOB - Por conta do Cliente"]
     c_frete = ttk.Combobox(scrollable_frame, textvariable=var_frete, values=opcoes_frete, state="readonly")
     c_frete.grid(row=row_idx[0], column=1, sticky="ew", padx=5)
-    # Não aumentamos row_idx aqui, vamos colocar o Pagamento ao lado se quiser, ou embaixo.
-    # Vamos colocar EMBAIXO para manter o padrão responsivo de Label+Input por linha nesse setor ou usar o grid lateral.
-    # Para simplicidade, vamos pular linha.
+
     row_idx[0] += 1
 
     # --- PAGAMENTO ---
     ttk.Label(scrollable_frame, text="Cond. Pagamento:").grid(row=row_idx[0], column=0, sticky="w", padx=5, pady=5)
     opcoes_pag = ["À vista", "15 DD", "15 / 30 DD", "15 / 30 / 45 DD", "15 / 30 / 45 / 60 DD", "1X Cartão", "2X Catão", "3X Cartão", "4X Cartão"]
-    c_pag = ttk.Combobox(scrollable_frame, textvariable=var_pagamento, values=opcoes_pag, state="readonly") # readonly impede digitar texto livre
-    # Se quiser permitir digitar algo diferente da lista, tire o state="readonly"
+    c_pag = ttk.Combobox(scrollable_frame, textvariable=var_pagamento, values=opcoes_pag, state="readonly")
     c_pag.grid(row=row_idx[0], column=1, sticky="ew", padx=5, pady=5)
     row_idx[0] += 1
 
@@ -145,7 +148,6 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
                 row_chk += 1
 
     # 3. CAMPOS DE TEXTO
-    # --- FILTRO IMPORTANTE: Removemos Frete E Pagamento daqui ---
     todos_campos_texto = [
         p for p in todos_placeholders 
         if not p.startswith("X_") 

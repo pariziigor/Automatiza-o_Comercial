@@ -6,7 +6,7 @@ class GeradorPropostasApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gerador Automático de Propostas - v3.2")
-        self.root.geometry("600x700") # Aumentei um pouco mais
+        self.root.geometry("600x700") 
         
         # Variáveis de Caminho
         self.path_modelo = tk.StringVar()
@@ -15,8 +15,7 @@ class GeradorPropostasApp:
         
         # --- VARIÁVEIS DE OPÇÃO ---
         self.var_frete = tk.StringVar(value="CIF - Por conta do destinatário")
-        self.var_pagamento = tk.StringVar(value="À vista") # NOVA VARIÁVEL
-        
+        self.var_pagamento = tk.StringVar(value="À vista")
         self.dados_finais = {}
         
         self._setup_ui()
@@ -43,7 +42,6 @@ class GeradorPropostasApp:
         
         # 2. Pagamento (NOVO)
         ttk.Label(f_opcoes, text="Cond. Pagamento:").grid(row=1, column=0, sticky="w", pady=5)
-        # Edite esta lista conforme suas necessidades
         opcoes_pag = ["À vista", "15 DD", "15 / 30 DD", "15 / 30 / 45 DD", "15 / 30 / 45 / 60 DD", "1X Cartão", "2X Catão", "3X Cartão", "4X Cartão"]
         c_pag = ttk.Combobox(f_opcoes, textvariable=self.var_pagamento, values=opcoes_pag, state="readonly", width=35)
         c_pag.grid(row=1, column=1, padx=10, pady=5)
