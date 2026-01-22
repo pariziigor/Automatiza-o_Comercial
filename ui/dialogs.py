@@ -1,39 +1,32 @@
 import tkinter as tk
 from tkinter import ttk
 
-# --- 1. CONFIGURAÇÃO DE TEXTOS E ORDEM ---
+# --- CONFIGURAÇÃO DE TEXTOS E ORDEM ---
 LABELS_AMIGAVEIS = {
-    # --- GRUPO 1: Dados do Projeto ---
-    "NOME_CLIENTE": "Nome do Cliente",
-    "NUMERO_PROJETO": "Número do Projeto",
-    "TIPO_OBRA": "Tipo de Obra",
-    "DESCRICAO_DA_OBRA": "Descrição da Obra",
-    "ENDERECO_DA_OBRA": "Endereço da Obra",
-    "ARQUIVOS_RECEBIDOS": "Arquivos Recebidos",
-    "RESPONSAVEL_TECNICO": "Responsável Técnico/Contato",
-    "CREA": "CREA",
-
-    # --- GRUPO 2: Solicitante (Ordem desejada) ---
+    # --- GRUPO 1: Solicitante ---
     "NOME_EMPRESA_SOLICITANTE": "Razão Social (Cliente)",
     "CNPJ_CPF_SOLICITANTE": "CNPJ / CPF",
     "IE_SOLICITANTE": "Inscrição Estadual",
+    "EMAIL_SOLICITANTE": "E-mail de Contato",
+    "CELULAR_SOLICITANTE": "Telefone / Celular",
     "ENDERECO_SOLICITANTE": "Endereço Completo",
     "BAIRRO_SOLICITANTE": "Bairro",
     "CIDADE_SOLICITANTE": "Cidade / Município",
     "CEP_SOLICITANTE": "CEP",
-    "EMAIL_SOLICITANTE": "E-mail de Contato",
-    "CELULAR_SOLICITANTE": "Telefone / Celular",
     
-    # --- GRUPO 3: Faturamento ---
+    # --- GRUPO 2: Faturamento ---
     "NOME_EMPRESA_CONTRATANTE": "Razão Social (Faturamento)",
     "CNPJ_CPF_CONTRATANTE": "CNPJ / CPF (Pagador)",
-    "ENDERECO_CONTRATANTE": "Endereço de Cobrança",
-    "BAIRRO_CONTRATANTE": "Bairro",
-    "CIDADE_CONTRATANTE": "Cidade",
-    "CEP_CONTRATANTE": "CEP",
     "EMAIL_CONTRATANTE": "E-mail Financeiro",
-    "CELULAR_CONTRATANTE": "Celular",
-    "ENDERECO_ENTREGA": "Endereço de Entrega",
+    "ENDERECO_CONTRATANTE": "Endereço de Cobrança",
+    
+    # --- GRUPO 3: Outros ---
+    "DATA_PROPOSTA": "Data da Proposta",
+    "VALIDADE_PROPOSTA": "Validade (dias)",
+    "ARQUIVOS_RECEBIDOS": "Arquivos Recebidos",
+    "PRAZO_ENTREGA": "Prazo de Entrega",
+    "OBSERVACOES": "Observações Gerais"
+    # Note que tirei CONDICOES_PAGAMENTO daqui pois ele terá label próprio lá em cima
 }
 
 def formatar_label(texto_cru):
@@ -48,9 +41,10 @@ def obter_prioridade(campo):
     except ValueError:
         return 999
 
-# --- JANELA PRINCIPAL ---
+# --- JANELA PRINCIPAL ATUALIZADA ---
 
-def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, valor_frete_inicial):
+# Note o novo argumento: valor_pagamento_inicial
+def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, valor_frete_inicial, valor_pagamento_inicial):
     win = tk.Toplevel(parent)
     win.title("Conferência Geral dos Dados")
     win.geometry("1100x750")
@@ -59,7 +53,9 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     resultado_final = {}
     widgets_texto = {}
     widgets_servicos = {}
+    
     var_frete = tk.StringVar(value=valor_frete_inicial)
+    var_pagamento = tk.StringVar(value=valor_pagamento_inicial) # Variável nova
 
     # --- CABEÇALHO ---
     f_header = ttk.Frame(win, padding=15)
@@ -67,7 +63,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     ttk.Label(f_header, text="Revise os dados", font=("Arial", 14, "bold")).pack(anchor="w")
     ttk.Label(f_header, text="Redimensione a janela para ajustar os campos.", font=("Arial", 9), foreground="gray").pack(anchor="w")
 
-    # --- ÁREA DE SCROLL RESPONSIVA ---
+    # --- SCROLL ---
     container = ttk.Frame(win)
     container.pack(fill="both", expand=True, padx=10, pady=5)
     
@@ -83,11 +79,9 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
 
     scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
     canvas.configure(yscrollcommand=scrollbar.set)
-    
     canvas.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    # --- CONFIGURAÇÃO DO GRID (PESOS) ---
     scrollable_frame.columnconfigure(1, weight=1)
     scrollable_frame.columnconfigure(4, weight=1)
 
@@ -100,18 +94,30 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
         lbl.grid(row=row_idx[0], column=0, columnspan=5, sticky="w", pady=(0, 10))
         row_idx[0] += 1
 
-    # 1. FRETE
+    # ==========================================
+    # 1. OPÇÕES DA PROPOSTA (FRETE E PAGAMENTO)
+    # ==========================================
     add_separator("1. OPÇÕES DA PROPOSTA", "#444")
+    
+    # --- FRETE ---
     ttk.Label(scrollable_frame, text="Tipo de Frete:").grid(row=row_idx[0], column=0, sticky="w", padx=5)
-    
-    # --- CORREÇÃO: Definindo a lista antes de usar ---
     opcoes_frete = ["CIF - Por conta do destinatário", "FOB - Por conta do Cliente"]
-    
-    combo = ttk.Combobox(scrollable_frame, textvariable=var_frete, values=opcoes_frete, state="readonly")
-    combo.grid(row=row_idx[0], column=1, sticky="ew", padx=5)
+    c_frete = ttk.Combobox(scrollable_frame, textvariable=var_frete, values=opcoes_frete, state="readonly")
+    c_frete.grid(row=row_idx[0], column=1, sticky="ew", padx=5)
+    # Não aumentamos row_idx aqui, vamos colocar o Pagamento ao lado se quiser, ou embaixo.
+    # Vamos colocar EMBAIXO para manter o padrão responsivo de Label+Input por linha nesse setor ou usar o grid lateral.
+    # Para simplicidade, vamos pular linha.
     row_idx[0] += 1
 
-    # 2. SERVIÇOS (GRID RESPONSIVO)
+    # --- PAGAMENTO ---
+    ttk.Label(scrollable_frame, text="Cond. Pagamento:").grid(row=row_idx[0], column=0, sticky="w", padx=5, pady=5)
+    opcoes_pag = ["À vista", "15 DD", "15 / 30 DD", "15 / 30 / 45 DD", "15 / 30 / 45 / 60 DD", "1X Cartão", "2X Catão", "3X Cartão", "4X Cartão"]
+    c_pag = ttk.Combobox(scrollable_frame, textvariable=var_pagamento, values=opcoes_pag, state="readonly") # readonly impede digitar texto livre
+    # Se quiser permitir digitar algo diferente da lista, tire o state="readonly"
+    c_pag.grid(row=row_idx[0], column=1, sticky="ew", padx=5, pady=5)
+    row_idx[0] += 1
+
+    # 2. SERVIÇOS
     lista_servicos = sorted([p for p in todos_placeholders if p.startswith("X_")])
     if lista_servicos:
         add_separator("2. SELEÇÃO DE SERVIÇOS", "#0055cc")
@@ -139,7 +145,13 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
                 row_chk += 1
 
     # 3. CAMPOS DE TEXTO
-    todos_campos_texto = [p for p in todos_placeholders if not p.startswith("X_") and p != "TIPO_FRETE"]
+    # --- FILTRO IMPORTANTE: Removemos Frete E Pagamento daqui ---
+    todos_campos_texto = [
+        p for p in todos_placeholders 
+        if not p.startswith("X_") 
+        and p != "TIPO_FRETE" 
+        and p != "CONDICOES_PAGAMENTO"
+    ]
     
     grupo_solicitante = [p for p in todos_campos_texto if p.endswith("_SOLICITANTE")]
     grupo_contratante = [p for p in todos_campos_texto if p.endswith("_CONTRATANTE")]
@@ -165,13 +177,12 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
                 ent.config(background="#d9ffcc")
             widgets_texto[campo] = ent
 
-            if i % 2 == 0: # LADO ESQUERDO
+            if i % 2 == 0: # ESQUERDA
                 l.grid(row=row_idx[0], column=0, sticky="w", padx=(5, 5), pady=5)
                 ent.grid(row=row_idx[0], column=1, sticky="ew", padx=(0, 20), pady=5)
-                
                 if i == len(lista_campos) - 1:
                     row_idx[0] += 1
-            else: # LADO DIREITO
+            else: # DIREITA
                 ttk.Frame(scrollable_frame, width=20).grid(row=row_idx[0], column=2)
                 l.grid(row=row_idx[0], column=3, sticky="w", padx=(5, 5), pady=5)
                 ent.grid(row=row_idx[0], column=4, sticky="ew", padx=(0, 5), pady=5)
@@ -183,7 +194,10 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
 
     # BOTÃO FINAL
     def confirmar():
+        # Salvamos os valores dos Combobox manualmente
         resultado_final["TIPO_FRETE"] = var_frete.get()
+        resultado_final["CONDICOES_PAGAMENTO"] = var_pagamento.get()
+        
         for k, v in widgets_servicos.items():
             resultado_final[k] = "X" if v.get() else ""
         for k, entry in widgets_texto.items():

@@ -1,20 +1,21 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from services import reader, parser, generator
-
+from ui.dialogs import janela_verificacao_unificada
 class GeradorPropostasApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Gerador Automático de Propostas - v3.1")
-        self.root.geometry("600x650") # Aumentei um pouco a altura para caber o campo novo
+        self.root.title("Gerador Automático de Propostas - v3.2")
+        self.root.geometry("600x700") # Aumentei um pouco mais
         
         # Variáveis de Caminho
         self.path_modelo = tk.StringVar()
         self.path_solicitante = tk.StringVar()
         self.path_faturamento = tk.StringVar()
         
-        # --- NOVO: Variável para o Frete ---
-        self.var_frete = tk.StringVar(value="CIF - Por conta do destinatário") # Valor padrão
+        # --- VARIÁVEIS DE OPÇÃO ---
+        self.var_frete = tk.StringVar(value="CIF - Por conta do destinatário")
+        self.var_pagamento = tk.StringVar(value="À vista") # NOVA VARIÁVEL
         
         self.dados_finais = {}
         
@@ -25,16 +26,27 @@ class GeradorPropostasApp:
         f_arquivos = ttk.LabelFrame(self.root, text="Arquivos de Entrada", padding=10)
         f_arquivos.pack(fill="x", padx=10, pady=10)
         
-        # 1. Modelo
         self._criar_seletor(f_arquivos, "Modelo Word:", self.path_modelo, 0)
-        
-        # 2. Doc Solicitante
         self._criar_seletor(f_arquivos, "Ficha Solicitante:", self.path_solicitante, 1)
-        
-        # 3. Doc Faturamento
         self._criar_seletor(f_arquivos, "Ficha Faturamento (Opcional):", self.path_faturamento, 2)
-        ttk.Label(f_arquivos, text="(Deixe vazio caso não seja utilizado um anexo)", font=("Arial", 8, "italic")).grid(row=3, column=1, sticky="w", padx=5)
+        ttk.Label(f_arquivos, text="(Deixe vazio se for o mesmo)", font=("Arial", 8, "italic")).grid(row=3, column=1, sticky="w", padx=5)
 
+        # --- FRAME DE OPÇÕES (Frete + Pagamento) ---
+        f_opcoes = ttk.LabelFrame(self.root, text="Opções da Proposta", padding=10)
+        f_opcoes.pack(fill="x", padx=10, pady=5)
+        
+        # 1. Frete
+        ttk.Label(f_opcoes, text="Tipo de Frete:").grid(row=0, column=0, sticky="w", pady=5)
+        opcoes_frete = ["CIF - Por conta do destinatário", "FOB - Por conta do Cliente"]
+        c_frete = ttk.Combobox(f_opcoes, textvariable=self.var_frete, values=opcoes_frete, state="readonly", width=35)
+        c_frete.grid(row=0, column=1, padx=10, pady=5)
+        
+        # 2. Pagamento (NOVO)
+        ttk.Label(f_opcoes, text="Cond. Pagamento:").grid(row=1, column=0, sticky="w", pady=5)
+        # Edite esta lista conforme suas necessidades
+        opcoes_pag = ["À vista", "15 DD", "15 / 30 DD", "15 / 30 / 45 DD", "15 / 30 / 45 / 60 DD", "1X Cartão", "2X Catão", "3X Cartão", "4X Cartão"]
+        c_pag = ttk.Combobox(f_opcoes, textvariable=self.var_pagamento, values=opcoes_pag, state="readonly", width=35)
+        c_pag.grid(row=1, column=1, padx=10, pady=5)
         
         # Botão Ação
         self.btn_processar = ttk.Button(self.root, text="INICIAR PROCESSO", command=self.fluxo_principal, state="disabled")
@@ -69,41 +81,31 @@ class GeradorPropostasApp:
             self.log("1. Analisando Modelo Word...")
             placeholders = reader.extrair_placeholders_modelo(self.path_modelo.get())
             
-            # --- EXTRAÇÃO AUTOMÁTICA ---
             self.log("2. Extraindo dados dos arquivos...")
-            
-            # Lê Solicitante
             txt_solicitante = reader.ler_documento_cliente(self.path_solicitante.get())
             dados_auto = parser.processar_dados(placeholders, txt_solicitante)
 
-            # Lê Faturamento (se houver) e mescla
             path_fat = self.path_faturamento.get()
             if path_fat:
                 txt_fat = reader.ler_documento_cliente(path_fat)
                 dados_fat = parser.processar_dados(placeholders, txt_fat, sufixo_filtro="_CONTRATANTE")
                 dados_auto.update(dados_fat)
 
-            # --- NOVA JANELA UNIFICADA ---
-            # Aqui passamos o valor do Frete selecionado na tela principal para dentro da revisão
-            from ui.dialogs import janela_verificacao_unificada
-            
             self.log("3. Aguardando verificação do usuário...")
             
-            # Esta função vai abrir a janela e só retorna quando o usuário clicar em Confirmar
-            # Ela devolve um dicionário COMPLETO (Texto + Serviços + Frete)
+            # --- ATENÇÃO AQUI: PASSAMOS OS DOIS VALORES AGORA ---
             dados_revisados = janela_verificacao_unificada(
                 self.root, 
                 placeholders, 
                 dados_auto, 
-                self.var_frete.get() # Passa o valor atual do dropdown da tela principal
+                self.var_frete.get(),      # Passa valor do Frete
+                self.var_pagamento.get()   # Passa valor do Pagamento
             )
             
-            # Se o usuário fechou a janela sem confirmar, o dicionário vem vazio
             if not dados_revisados:
                 self.log("Processo cancelado pelo usuário.")
                 return
 
-            # --- GERAÇÃO FINAL ---
             self.log("4. Gerando documentos finais...")
             docx, pdf = generator.gerar_arquivos(self.path_modelo.get(), dados_revisados)
             
