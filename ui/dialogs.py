@@ -212,3 +212,187 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
 
     parent.wait_window(win)
     return resultado_final
+
+# --- NOVA FUNÇÃO: JANELA DE ORÇAMENTO ---
+def janela_itens_orcamento(parent, dados_anteriores):
+    """
+    Janela para inserir itens, quantidades e valores.
+    Retorna os dados anteriores ATUALIZADOS com a lista de itens e o total.
+    """
+    win = tk.Toplevel(parent)
+    win.title("Passo 2: Composição do Orçamento")
+    win.geometry("900x600")
+    win.minsize(800, 500)
+
+    # Lista para armazenar os itens na memória (para o Word)
+    # Formato: [{'descricao': 'X', 'qtd': 1, 'unitario': '100', 'total': '100'}]
+    lista_itens = []
+    
+    # Variável para o Total Geral
+    total_geral_float = 0.0
+
+    # --- LAYOUT ---
+    
+    # 1. Área de Inserção
+    f_input = ttk.LabelFrame(win, text="Adicionar Novo Item", padding=10)
+    f_input.pack(fill="x", padx=10, pady=10)
+
+    # Grid de inputs
+    ttk.Label(f_input, text="Descrição do Serviço / Produto:").grid(row=0, column=0, sticky="w")
+    entry_desc = ttk.Entry(f_input, width=50)
+    entry_desc.grid(row=1, column=0, sticky="ew", padx=(0, 10))
+
+    ttk.Label(f_input, text="Qtd:").grid(row=0, column=1, sticky="w")
+    entry_qtd = ttk.Entry(f_input, width=10)
+    entry_qtd.grid(row=1, column=1, sticky="ew", padx=(0, 10))
+    entry_qtd.insert(0, "1") # Valor padrão
+
+    ttk.Label(f_input, text="Preço Unitário (R$):").grid(row=0, column=2, sticky="w")
+    entry_valor = ttk.Entry(f_input, width=15)
+    entry_valor.grid(row=1, column=2, sticky="ew", padx=(0, 10))
+
+    f_input.columnconfigure(0, weight=3) # Descrição estica mais
+
+    # 2. Lista de Itens (Treeview)
+    f_lista = ttk.Frame(win)
+    f_lista.pack(fill="both", expand=True, padx=10, pady=5)
+
+    columns = ("desc", "qtd", "unit", "subtotal")
+    tree = ttk.Treeview(f_lista, columns=columns, show="headings", height=10)
+    
+    tree.heading("desc", text="Descrição")
+    tree.heading("qtd", text="Qtd")
+    tree.heading("unit", text="Valor Unit.")
+    tree.heading("subtotal", text="Subtotal")
+
+    tree.column("desc", width=300)
+    tree.column("qtd", width=50, anchor="center")
+    tree.column("unit", width=100, anchor="e")
+    tree.column("subtotal", width=100, anchor="e")
+
+    scrollbar = ttk.Scrollbar(f_lista, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    
+    tree.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    # 3. Rodapé (Total e Botões)
+    f_footer = ttk.Frame(win, padding=15)
+    f_footer.pack(fill="x")
+
+    lbl_total = ttk.Label(f_footer, text="TOTAL GERAL: R$ 0,00", font=("Arial", 14, "bold"), foreground="#006600")
+    lbl_total.pack(side="left")
+
+    # --- LÓGICA INTERNA ---
+
+    def formatar_moeda(valor_float):
+        return f"R$ {valor_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def converter_brl_para_float(texto):
+        # Remove R$, espaços e pontos de milhar, troca vírgula por ponto
+        limpo = texto.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+        try:
+            return float(limpo)
+        except ValueError:
+            return 0.0
+
+    def adicionar_item():
+        nonlocal total_geral_float
+        
+        desc = entry_desc.get().strip()
+        qtd_txt = entry_qtd.get().strip() or "1"
+        valor_txt = entry_valor.get().strip()
+
+        if not desc or not valor_txt:
+            return # Não faz nada se estiver vazio
+
+        try:
+            qtd = float(qtd_txt.replace(",", "."))
+            valor_unit = converter_brl_para_float(valor_txt)
+            subtotal = qtd * valor_unit
+            
+            # Formatação para exibir
+            unit_fmt = formatar_moeda(valor_unit)
+            subtotal_fmt = formatar_moeda(subtotal)
+            qtd_fmt = f"{qtd:g}" # Remove casas decimais se for inteiro (1.0 -> 1)
+
+            # Adiciona na Treeview (Visual)
+            tree.insert("", "end", values=(desc, qtd_fmt, unit_fmt, subtotal_fmt))
+            
+            # Adiciona na Lista de Dados (Para o Word)
+            lista_itens.append({
+                "descricao": desc,
+                "qtd": qtd_fmt,
+                "unitario": unit_fmt,
+                "subtotal": subtotal_fmt
+            })
+
+            # Atualiza Total
+            total_geral_float += subtotal
+            lbl_total.config(text=f"TOTAL GERAL: {formatar_moeda(total_geral_float)}")
+
+            # Limpa campos
+            entry_desc.delete(0, tk.END)
+            entry_qtd.delete(0, tk.END)
+            entry_qtd.insert(0, "1")
+            entry_valor.delete(0, tk.END)
+            entry_desc.focus()
+
+        except ValueError:
+            tk.messagebox.showerror("Erro", "Valor ou Quantidade inválidos.")
+
+    def remover_item():
+        nonlocal total_geral_float
+        selected = tree.selection()
+        if not selected: return
+
+        for item_id in selected:
+            # Pega os valores para subtrair do total
+            valores = tree.item(item_id)['values']
+            subtotal_str = valores[3] # Índice 3 é o subtotal
+            subtotal_float = converter_brl_para_float(subtotal_str)
+            
+            total_geral_float -= subtotal_float
+            
+            # Remove da Treeview
+            tree.delete(item_id)
+            
+            # Remove da lista de dados (encontra pelo índice ou descrição - simplificado aqui)
+            # Para simplificar, vamos reconstruir a lista baseado no que sobrou na Treeview
+            pass 
+        
+        # Reconstrução segura da lista e total
+        lista_itens.clear()
+        total_geral_float = 0.0
+        
+        for child in tree.get_children():
+            vals = tree.item(child)['values']
+            # vals = [desc, qtd, unit, subtotal]
+            lista_itens.append({
+                "descricao": vals[0],
+                "qtd": vals[1],
+                "unitario": vals[2],
+                "subtotal": vals[3]
+            })
+            total_geral_float += converter_brl_para_float(vals[3])
+
+        lbl_total.config(text=f"TOTAL GERAL: {formatar_moeda(total_geral_float)}")
+
+    def finalizar():
+        # Adiciona os dados novos ao dicionário principal
+        dados_anteriores["ITENS_ORCAMENTO"] = lista_itens
+        dados_anteriores["VALOR_TOTAL_PROPOSTA"] = formatar_moeda(total_geral_float)
+        
+        win.destroy()
+
+    # Botões de Ação
+    btn_add = ttk.Button(f_input, text="Adicionar (+)", command=adicionar_item)
+    btn_add.grid(row=1, column=3, sticky="ew", padx=10)
+    
+    btn_remove = ttk.Button(f_lista, text="Remover Item Selecionado", command=remover_item)
+    btn_remove.pack(pady=5, anchor="e")
+
+    ttk.Button(f_footer, text="CONCLUIR E GERAR DOCUMENTO", command=finalizar).pack(side="right", ipady=10, padx=5)
+
+    parent.wait_window(win)
+    return dados_anteriores

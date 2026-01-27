@@ -76,9 +76,11 @@ class GeradorPropostasApp:
     # --- FLUXO PRINCIPAL ATUALIZADO ---
     def fluxo_principal(self):
         try:
+            # 1. Analisa o template
             self.log("1. Analisando Modelo Word...")
             placeholders = reader.extrair_placeholders_modelo(self.path_modelo.get())
             
+            # 2. Extrai dados (Solicitante + Faturamento)
             self.log("2. Extraindo dados dos arquivos...")
             txt_solicitante = reader.ler_documento_cliente(self.path_solicitante.get())
             dados_auto = parser.processar_dados(placeholders, txt_solicitante)
@@ -89,26 +91,46 @@ class GeradorPropostasApp:
                 dados_fat = parser.processar_dados(placeholders, txt_fat, sufixo_filtro="_CONTRATANTE")
                 dados_auto.update(dados_fat)
 
-            self.log("3. Aguardando verificação do usuário...")
+            # 3. PASSO 1: Janela de Revisão (Dados Cadastrais)
+            self.log("3. Aguardando verificação do usuário (Passo 1/2)...")
             
-            # --- ATENÇÃO AQUI: PASSAMOS OS DOIS VALORES AGORA ---
+            # Importação aqui dentro para garantir que pega a versão atualizada
+            from ui.dialogs import janela_verificacao_unificada, janela_itens_orcamento
+            
             dados_revisados = janela_verificacao_unificada(
                 self.root, 
                 placeholders, 
                 dados_auto, 
-                self.var_frete.get(),      # Passa valor do Frete
-                self.var_pagamento.get()   # Passa valor do Pagamento
+                self.var_frete.get(),
+                self.var_pagamento.get()
             )
             
+            # Se o usuário fechar a janela sem confirmar, cancela tudo
             if not dados_revisados:
-                self.log("Processo cancelado pelo usuário.")
+                self.log("Processo cancelado na fase de revisão.")
                 return
 
-            self.log("4. Gerando documentos finais...")
-            docx, pdf = generator.gerar_arquivos(self.path_modelo.get(), dados_revisados)
+            # 4. PASSO 2: Janela de Orçamento (Itens e Valores)
+            self.log("4. Aguardando composição do orçamento (Passo 2/2)...")
+            
+            dados_finais_completos = janela_itens_orcamento(self.root, dados_revisados)
+            
+            # Verificação de segurança caso feche a segunda janela
+            if "ITENS_ORCAMENTO" not in dados_finais_completos:
+                 # Cria lista vazia para não dar erro no Word se o usuário fechar no X
+                 dados_finais_completos["ITENS_ORCAMENTO"] = []
+                 dados_finais_completos["VALOR_TOTAL_PROPOSTA"] = "R$ 0,00"
+
+            # 5. Geração Final (Acontece UMA VEZ só agora)
+            self.log("5. Gerando documentos finais...")
+            docx, pdf = generator.gerar_arquivos(self.path_modelo.get(), dados_finais_completos)
             
             messagebox.showinfo("Sucesso", f"Arquivos gerados!\nWord: {docx}\nPDF: {pdf}")
             self.log("Processo concluído com sucesso.")
+
+        except Exception as e:
+            self.log(f"ERRO: {e}")
+            messagebox.showerror("Erro Crítico", str(e))
 
         except Exception as e:
             self.log(f"ERRO: {e}")
