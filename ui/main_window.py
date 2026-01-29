@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from services import reader, parser, generator
-from ui.dialogs import janela_verificacao_unificada
+from ui.dialogs import janela_verificacao_unificada, janela_itens_orcamento, janela_projeto_estrutural
 class GeradorPropostasApp:
     def __init__(self, root):
         self.root = root
@@ -120,6 +120,15 @@ class GeradorPropostasApp:
                  # Cria lista vazia para não dar erro no Word se o usuário fechar no X
                  dados_finais_completos["ITENS_ORCAMENTO"] = []
                  dados_finais_completos["VALOR_TOTAL_PROPOSTA"] = "R$ 0,00"
+
+            # --- NOVO: PASSO 3 - Escopo Estrutural ---
+            self.log("5. Aguardando escopo estrutural (Passo 3/3)...")
+            
+            dados_finais = janela_projeto_estrutural(self.root, dados_finais_completos)
+            
+            # Segurança se fechar a janela 3
+            if "ITENS_ESTRUTURAL" not in dados_finais:
+                dados_finais["ITENS_ESTRUTURAL"] = []
 
             # 5. Geração Final (Acontece UMA VEZ só agora)
             self.log("5. Gerando documentos finais...")

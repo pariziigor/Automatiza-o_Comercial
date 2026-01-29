@@ -396,3 +396,99 @@ def janela_itens_orcamento(parent, dados_anteriores):
 
     parent.wait_window(win)
     return dados_anteriores
+
+    # --- NOVA FUNÇÃO: JANELA DE ESCOPO ESTRUTURAL ---
+def janela_projeto_estrutural(parent, dados_anteriores):
+    """
+    Janela para inserir os itens do Escopo do Projeto (Texto livre).
+    """
+    win = tk.Toplevel(parent)
+    win.title("Passo 3: Escopo do Projeto Estrutural")
+    win.geometry("900x650")
+    win.minsize(800, 500)
+
+    lista_itens_estrutural = []
+
+    # --- CABEÇALHO ---
+    ttk.Label(win, text="Definição do Escopo Estrutural", font=("Arial", 14, "bold")).pack(pady=10)
+    ttk.Label(win, text="Adicione os itens que farão parte da entrega (ex: Memória de Cálculo, ART, etc).", font=("Arial", 9)).pack()
+
+    # --- ÁREA DE INSERÇÃO ---
+    f_input = ttk.LabelFrame(win, text="Novo Item do Escopo", padding=10)
+    f_input.pack(fill="x", padx=10, pady=10)
+
+    ttk.Label(f_input, text="Descrição do Item:").pack(anchor="w")
+    
+    # Usamos Text em vez de Entry para permitir múltiplas linhas (sub-itens com bolinhas)
+    txt_desc = tk.Text(f_input, height=5, width=80) 
+    txt_desc.pack(fill="x", pady=5)
+    ttk.Label(f_input, text="Dica: Você pode colar textos com quebras de linha aqui.", font=("Arial", 8, "italic"), foreground="gray").pack(anchor="w")
+
+    # --- LISTA VISUAL (TREEVIEW) ---
+    f_lista = ttk.Frame(win)
+    f_lista.pack(fill="both", expand=True, padx=10, pady=5)
+
+    columns = ("desc",)
+    tree = ttk.Treeview(f_lista, columns=columns, show="headings", height=10)
+    
+    tree.heading("desc", text="Itens Adicionados")
+    tree.column("desc", width=800, anchor="w") # Coluna larga
+
+    scrollbar = ttk.Scrollbar(f_lista, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    
+    tree.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    # --- LÓGICA ---
+    def adicionar_item():
+        # Pega o texto do widget Text (do inicio '1.0' até o fim 'end-1c')
+        desc = txt_desc.get("1.0", "end-1c").strip()
+
+        if not desc:
+            return
+
+        # Adiciona na visualização (mostra apenas a primeira linha para não poluir)
+        primeira_linha = desc.split("\n")[0]
+        if len(desc.split("\n")) > 1:
+            primeira_linha += " (...)"
+            
+        tree.insert("", "end", values=(primeira_linha,), tags=(desc,)) # Guardamos o texto completo na tag
+        
+        # Adiciona na lista de dados real
+        lista_itens_estrutural.append(desc)
+
+        # Limpa o campo
+        txt_desc.delete("1.0", tk.END)
+        txt_desc.focus()
+
+    def remover_item():
+        selected = tree.selection()
+        if not selected: return
+
+        # Remove da lista de dados e da árvore
+        for item_id in selected:
+            # Precisamos achar o índice para remover da lista 'lista_itens_estrutural'
+            # Como a Treeview insere em ordem, o índice visual (index) geralmente bate com o da lista
+            idx = tree.index(item_id)
+            if idx < len(lista_itens_estrutural):
+                lista_itens_estrutural.pop(idx)
+            
+            tree.delete(item_id)
+
+    def finalizar():
+        dados_anteriores["ITENS_ESTRUTURAL"] = lista_itens_estrutural
+        win.destroy()
+
+    # --- BOTÕES ---
+    btn_add = ttk.Button(f_input, text="Adicionar Item à Lista", command=adicionar_item)
+    btn_add.pack(anchor="e", pady=5)
+    
+    f_footer = ttk.Frame(win, padding=15)
+    f_footer.pack(fill="x")
+    
+    ttk.Button(f_footer, text="Remover Selecionado", command=remover_item).pack(side="left")
+    ttk.Button(f_footer, text="CONCLUIR TUDO E GERAR PDF", command=finalizar).pack(side="right", ipady=10)
+
+    parent.wait_window(win)
+    return dados_anteriores
