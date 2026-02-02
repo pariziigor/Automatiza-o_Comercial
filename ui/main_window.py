@@ -15,7 +15,6 @@ class GeradorPropostasApp:
         
         # --- VARIÁVEIS DE OPÇÃO ---
         self.var_frete = tk.StringVar(value="CIF - Por conta do destinatário")
-        self.var_pagamento = tk.StringVar(value="À vista")
         self.dados_finais = {}
         
         self._setup_ui()
@@ -39,12 +38,6 @@ class GeradorPropostasApp:
         opcoes_frete = ["CIF - Por conta do destinatário", "FOB - Por conta do Cliente"]
         c_frete = ttk.Combobox(f_opcoes, textvariable=self.var_frete, values=opcoes_frete, state="readonly", width=35)
         c_frete.grid(row=0, column=1, padx=10, pady=5)
-        
-        # 2. Pagamento (NOVO)
-        ttk.Label(f_opcoes, text="Cond. Pagamento:").grid(row=1, column=0, sticky="w", pady=5)
-        opcoes_pag = ["À vista", "15 DD", "15 / 30 DD", "15 / 30 / 45 DD", "15 / 30 / 45 / 60 DD", "1X Cartão", "2X Catão", "3X Cartão", "4X Cartão"]
-        c_pag = ttk.Combobox(f_opcoes, textvariable=self.var_pagamento, values=opcoes_pag, state="readonly", width=35)
-        c_pag.grid(row=1, column=1, padx=10, pady=5)
         
         # Botão Ação
         self.btn_processar = ttk.Button(self.root, text="INICIAR PROCESSO", command=self.fluxo_principal, state="disabled")
@@ -91,55 +84,49 @@ class GeradorPropostasApp:
                 dados_fat = parser.processar_dados(placeholders, txt_fat, sufixo_filtro="_CONTRATANTE")
                 dados_auto.update(dados_fat)
 
-            # 3. PASSO 1: Janela de Revisão (Dados Cadastrais)
-            self.log("3. Aguardando verificação do usuário (Passo 1/2)...")
+            # --- PASSO 1: Revisão (Dados Cadastrais) ---
+            self.log("3. Aguardando verificação do usuário (Passo 1/3)...")
             
-            # Importação aqui dentro para garantir que pega a versão atualizada
-            from ui.dialogs import janela_verificacao_unificada, janela_itens_orcamento
+            from ui.dialogs import janela_verificacao_unificada, janela_itens_orcamento, janela_projeto_estrutural
             
             dados_revisados = janela_verificacao_unificada(
                 self.root, 
                 placeholders, 
                 dados_auto, 
                 self.var_frete.get(),
-                self.var_pagamento.get()
             )
             
-            # Se o usuário fechar a janela sem confirmar, cancela tudo
             if not dados_revisados:
                 self.log("Processo cancelado na fase de revisão.")
                 return
 
-            # 4. PASSO 2: Janela de Orçamento (Itens e Valores)
-            self.log("4. Aguardando composição do orçamento (Passo 2/2)...")
+            # --- PASSO 2: Escopo Estrutural (AGORA VEM ANTES) ---
+            self.log("4. Aguardando escopo estrutural (Passo 2/3)...")
             
-            dados_finais_completos = janela_itens_orcamento(self.root, dados_revisados)
+            # Passamos 'dados_revisados' e recebemos 'dados_com_estrutural'
+            dados_com_estrutural = janela_projeto_estrutural(self.root, dados_revisados)
             
-            # Verificação de segurança caso feche a segunda janela
-            if "ITENS_ORCAMENTO" not in dados_finais_completos:
-                 # Cria lista vazia para não dar erro no Word se o usuário fechar no X
-                 dados_finais_completos["ITENS_ORCAMENTO"] = []
-                 dados_finais_completos["VALOR_TOTAL_PROPOSTA"] = "R$ 0,00"
+            # Segurança se fechar a janela
+            if "ITENS_ESTRUTURAL" not in dados_com_estrutural:
+                dados_com_estrutural["ITENS_ESTRUTURAL"] = []
 
-            # --- NOVO: PASSO 3 - Escopo Estrutural ---
-            self.log("5. Aguardando escopo estrutural (Passo 3/3)...")
+            # --- PASSO 3: Orçamento (AGORA VEM POR ÚLTIMO) ---
+            self.log("5. Aguardando composição do orçamento (Passo 3/3)...")
             
-            dados_finais = janela_projeto_estrutural(self.root, dados_finais_completos)
+            # Passamos 'dados_com_estrutural' e recebemos 'dados_finais'
+            dados_finais = janela_itens_orcamento(self.root, dados_com_estrutural)
             
-            # Segurança se fechar a janela 3
-            if "ITENS_ESTRUTURAL" not in dados_finais:
-                dados_finais["ITENS_ESTRUTURAL"] = []
+            # Segurança se fechar a janela
+            if "ITENS_ORCAMENTO" not in dados_finais:
+                 dados_finais["ITENS_ORCAMENTO"] = []
+                 dados_finais["VALOR_TOTAL_PROPOSTA"] = "R$ 0,00"
 
-            # 5. Geração Final (Acontece UMA VEZ só agora)
-            self.log("5. Gerando documentos finais...")
-            docx, pdf = generator.gerar_arquivos(self.path_modelo.get(), dados_finais_completos)
+            # 6. Geração Final
+            self.log("6. Gerando documentos finais...")
+            docx, pdf = generator.gerar_arquivos(self.path_modelo.get(), dados_finais)
             
             messagebox.showinfo("Sucesso", f"Arquivos gerados!\nWord: {docx}\nPDF: {pdf}")
             self.log("Processo concluído com sucesso.")
-
-        except Exception as e:
-            self.log(f"ERRO: {e}")
-            messagebox.showerror("Erro Crítico", str(e))
 
         except Exception as e:
             self.log(f"ERRO: {e}")

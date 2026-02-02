@@ -50,7 +50,9 @@ def obter_prioridade(campo):
 
 # --- JANELA PRINCIPAL ATUALIZADA ---
 
-def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, valor_frete_inicial, valor_pagamento_inicial):
+def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, valor_frete_inicial):
+    # ^^^ REMOVIDO argumento valor_pagamento_inicial da linha acima
+    
     win = tk.Toplevel(parent)
     win.title("Conferência Geral dos Dados")
     win.geometry("1100x750")
@@ -61,7 +63,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     widgets_servicos = {}
     
     var_frete = tk.StringVar(value=valor_frete_inicial)
-    var_pagamento = tk.StringVar(value=valor_pagamento_inicial) 
+    # REMOVIDO var_pagamento
 
     # --- CABEÇALHO ---
     f_header = ttk.Frame(win, padding=15)
@@ -100,25 +102,16 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
         lbl.grid(row=row_idx[0], column=0, columnspan=5, sticky="w", pady=(0, 10))
         row_idx[0] += 1
 
-    # ==========================================
-    # 1. OPÇÕES DA PROPOSTA (FRETE E PAGAMENTO)
-    # ==========================================
+    # 1. OPÇÕES
     add_separator("1. OPÇÕES DA PROPOSTA", "#444")
     
-    # --- FRETE ---
     ttk.Label(scrollable_frame, text="Tipo de Frete:").grid(row=row_idx[0], column=0, sticky="w", padx=5)
     opcoes_frete = ["CIF - Por conta do destinatário", "FOB - Por conta do Cliente"]
     c_frete = ttk.Combobox(scrollable_frame, textvariable=var_frete, values=opcoes_frete, state="readonly")
     c_frete.grid(row=row_idx[0], column=1, sticky="ew", padx=5)
-
     row_idx[0] += 1
-
-    # --- PAGAMENTO ---
-    ttk.Label(scrollable_frame, text="Cond. Pagamento:").grid(row=row_idx[0], column=0, sticky="w", padx=5, pady=5)
-    opcoes_pag = ["À vista", "15 DD", "15 / 30 DD", "15 / 30 / 45 DD", "15 / 30 / 45 / 60 DD", "1X Cartão", "2X Catão", "3X Cartão", "4X Cartão"]
-    c_pag = ttk.Combobox(scrollable_frame, textvariable=var_pagamento, values=opcoes_pag, state="readonly")
-    c_pag.grid(row=row_idx[0], column=1, sticky="ew", padx=5, pady=5)
-    row_idx[0] += 1
+    
+    # REMOVIDO CAMPO DE PAGAMENTO DAQUI
 
     # 2. SERVIÇOS
     lista_servicos = sorted([p for p in todos_placeholders if p.startswith("X_")])
@@ -139,20 +132,25 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
             var_chk = tk.BooleanVar(value=False)
             chk = ttk.Checkbutton(f_servicos, text=nome_bonito, variable=var_chk)
             chk.grid(row=row_chk, column=col_chk, sticky="w", padx=10, pady=5)
-            
             widgets_servicos[servico] = var_chk
-            
             col_chk += 1
             if col_chk > 2:
                 col_chk = 0
                 row_chk += 1
 
     # 3. CAMPOS DE TEXTO
+    
+    campos_ignorados = [
+        "TIPO_FRETE", "VALOR_TOTAL_PROPOSTA", # Removido CONDICOES_PAGAMENTO daqui
+        "ITENS_ORCAMENTO", "ITENS_ESTRUTURAL",
+        "item", "item.descricao", "item.valor", "item.qtd", "item.subtotal"
+    ]
+
     todos_campos_texto = [
         p for p in todos_placeholders 
         if not p.startswith("X_") 
-        and p != "TIPO_FRETE" 
-        and p != "CONDICOES_PAGAMENTO"
+        and p not in campos_ignorados
+        and not p.startswith("item.")
     ]
     
     grupo_solicitante = [p for p in todos_campos_texto if p.endswith("_SOLICITANTE")]
@@ -166,25 +164,21 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     def desenhar_campos_lado_a_lado(lista_campos, titulo_secao, cor):
         if not lista_campos: return
         add_separator(titulo_secao, cor)
-        
         for i, campo in enumerate(lista_campos):
             valor_auto = dados_extraidos.get(campo, "")
             texto_label = formatar_label(campo)
-            
             l = ttk.Label(scrollable_frame, text=texto_label, font=("Arial", 9))
             ent = ttk.Entry(scrollable_frame)
-            
             if valor_auto:
                 ent.insert(0, valor_auto)
                 ent.config(background="#d9ffcc")
             widgets_texto[campo] = ent
 
-            if i % 2 == 0: # ESQUERDA
+            if i % 2 == 0:
                 l.grid(row=row_idx[0], column=0, sticky="w", padx=(5, 5), pady=5)
                 ent.grid(row=row_idx[0], column=1, sticky="ew", padx=(0, 20), pady=5)
-                if i == len(lista_campos) - 1:
-                    row_idx[0] += 1
-            else: # DIREITA
+                if i == len(lista_campos) - 1: row_idx[0] += 1
+            else:
                 ttk.Frame(scrollable_frame, width=20).grid(row=row_idx[0], column=2)
                 l.grid(row=row_idx[0], column=3, sticky="w", padx=(5, 5), pady=5)
                 ent.grid(row=row_idx[0], column=4, sticky="ew", padx=(0, 5), pady=5)
@@ -194,11 +188,9 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     desenhar_campos_lado_a_lado(grupo_solicitante, "4. DADOS DO SOLICITANTE", "#0055cc")
     desenhar_campos_lado_a_lado(grupo_contratante, "5. DADOS DE FATURAMENTO", "#cc5500")
 
-    # BOTÃO FINAL
     def confirmar():
-        # Salvamos os valores dos Combobox manualmente
         resultado_final["TIPO_FRETE"] = var_frete.get()
-        resultado_final["CONDICOES_PAGAMENTO"] = var_pagamento.get()
+        # REMOVIDO: resultado_final["CONDICOES_PAGAMENTO"] = ...
         
         for k, v in widgets_servicos.items():
             resultado_final[k] = "X" if v.get() else ""
@@ -208,67 +200,58 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
 
     f_footer = ttk.Frame(win, padding=15)
     f_footer.pack(fill="x")
-    ttk.Button(f_footer, text="CONFIRMAR E GERAR ARQUIVOS", command=confirmar).pack(fill="x", ipady=10)
+    ttk.Button(f_footer, text="CONFIRMAR E CONTINUAR", command=confirmar).pack(fill="x", ipady=10)
 
     parent.wait_window(win)
     return resultado_final
 
 # --- NOVA FUNÇÃO: JANELA DE ORÇAMENTO ---
+# --- FUNÇÃO: JANELA DE ORÇAMENTO (SIMPLIFICADA - SEM QUANTIDADE) ---
 def janela_itens_orcamento(parent, dados_anteriores):
     """
-    Janela para inserir itens, quantidades e valores.
-    Retorna os dados anteriores ATUALIZADOS com a lista de itens e o total.
+    Janela para inserir itens e valores (Simplificada).
     """
     win = tk.Toplevel(parent)
-    win.title("Passo 2: Composição do Orçamento")
+    win.title("Passo 3: Composição do Orçamento")
     win.geometry("900x600")
     win.minsize(800, 500)
 
-    # Lista para armazenar os itens na memória (para o Word)
-    # Formato: [{'descricao': 'X', 'qtd': 1, 'unitario': '100', 'total': '100'}]
     lista_itens = []
-    
-    # Variável para o Total Geral
     total_geral_float = 0.0
 
     # --- LAYOUT ---
     
     # 1. Área de Inserção
-    f_input = ttk.LabelFrame(win, text="Adicionar Novo Item", padding=10)
+    f_input = ttk.LabelFrame(win, text="Adicionar", padding=10) # Simplifiquei o título do quadro também
     f_input.pack(fill="x", padx=10, pady=10)
 
-    # Grid de inputs
-    ttk.Label(f_input, text="Descrição do Serviço / Produto:").grid(row=0, column=0, sticky="w")
-    entry_desc = ttk.Entry(f_input, width=50)
-    entry_desc.grid(row=1, column=0, sticky="ew", padx=(0, 10))
+    f_input.columnconfigure(0, weight=1)
 
-    ttk.Label(f_input, text="Qtd:").grid(row=0, column=1, sticky="w")
-    entry_qtd = ttk.Entry(f_input, width=10)
-    entry_qtd.grid(row=1, column=1, sticky="ew", padx=(0, 10))
-    entry_qtd.insert(0, "1") # Valor padrão
+    # Linha 1: Labels
+    # --- AQUI FOI FEITA A ALTERAÇÃO SOLICITADA ---
+    ttk.Label(f_input, text="Descrição:").grid(row=0, column=0, sticky="w")
+    
+    ttk.Label(f_input, text="Valor (R$):").grid(row=0, column=1, sticky="w", padx=10)
 
-    ttk.Label(f_input, text="Preço Unitário (R$):").grid(row=0, column=2, sticky="w")
-    entry_valor = ttk.Entry(f_input, width=15)
-    entry_valor.grid(row=1, column=2, sticky="ew", padx=(0, 10))
+    # Linha 2: Inputs
+    entry_desc = ttk.Entry(f_input)
+    entry_desc.grid(row=1, column=0, sticky="ew")
 
-    f_input.columnconfigure(0, weight=3) # Descrição estica mais
+    entry_valor = ttk.Entry(f_input, width=20)
+    entry_valor.grid(row=1, column=1, sticky="ew", padx=10)
 
     # 2. Lista de Itens (Treeview)
     f_lista = ttk.Frame(win)
     f_lista.pack(fill="both", expand=True, padx=10, pady=5)
 
-    columns = ("desc", "qtd", "unit", "subtotal")
+    columns = ("desc", "valor")
     tree = ttk.Treeview(f_lista, columns=columns, show="headings", height=10)
     
     tree.heading("desc", text="Descrição")
-    tree.heading("qtd", text="Qtd")
-    tree.heading("unit", text="Valor Unit.")
-    tree.heading("subtotal", text="Subtotal")
+    tree.heading("valor", text="Valor")
 
-    tree.column("desc", width=300)
-    tree.column("qtd", width=50, anchor="center")
-    tree.column("unit", width=100, anchor="e")
-    tree.column("subtotal", width=100, anchor="e")
+    tree.column("desc", width=600)
+    tree.column("valor", width=150, anchor="e")
 
     scrollbar = ttk.Scrollbar(f_lista, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
@@ -276,7 +259,7 @@ def janela_itens_orcamento(parent, dados_anteriores):
     tree.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    # 3. Rodapé (Total e Botões)
+    # 3. Rodapé
     f_footer = ttk.Frame(win, padding=15)
     f_footer.pack(fill="x")
 
@@ -289,7 +272,6 @@ def janela_itens_orcamento(parent, dados_anteriores):
         return f"R$ {valor_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     def converter_brl_para_float(texto):
-        # Remove R$, espaços e pontos de milhar, troca vírgula por ponto
         limpo = texto.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
         try:
             return float(limpo)
@@ -300,46 +282,31 @@ def janela_itens_orcamento(parent, dados_anteriores):
         nonlocal total_geral_float
         
         desc = entry_desc.get().strip()
-        qtd_txt = entry_qtd.get().strip() or "1"
         valor_txt = entry_valor.get().strip()
 
         if not desc or not valor_txt:
-            return # Não faz nada se estiver vazio
+            return
 
         try:
-            qtd = float(qtd_txt.replace(",", "."))
-            valor_unit = converter_brl_para_float(valor_txt)
-            subtotal = qtd * valor_unit
-            
-            # Formatação para exibir
-            unit_fmt = formatar_moeda(valor_unit)
-            subtotal_fmt = formatar_moeda(subtotal)
-            qtd_fmt = f"{qtd:g}" # Remove casas decimais se for inteiro (1.0 -> 1)
+            valor_float = converter_brl_para_float(valor_txt)
+            valor_fmt = formatar_moeda(valor_float)
 
-            # Adiciona na Treeview (Visual)
-            tree.insert("", "end", values=(desc, qtd_fmt, unit_fmt, subtotal_fmt))
+            tree.insert("", "end", values=(desc, valor_fmt))
             
-            # Adiciona na Lista de Dados (Para o Word)
             lista_itens.append({
                 "descricao": desc,
-                "qtd": qtd_fmt,
-                "unitario": unit_fmt,
-                "subtotal": subtotal_fmt
+                "valor": valor_fmt
             })
 
-            # Atualiza Total
-            total_geral_float += subtotal
+            total_geral_float += valor_float
             lbl_total.config(text=f"TOTAL GERAL: {formatar_moeda(total_geral_float)}")
 
-            # Limpa campos
             entry_desc.delete(0, tk.END)
-            entry_qtd.delete(0, tk.END)
-            entry_qtd.insert(0, "1")
             entry_valor.delete(0, tk.END)
             entry_desc.focus()
 
         except ValueError:
-            tk.messagebox.showerror("Erro", "Valor ou Quantidade inválidos.")
+            tk.messagebox.showerror("Erro", "Valor inválido.")
 
     def remover_item():
         nonlocal total_geral_float
@@ -347,47 +314,31 @@ def janela_itens_orcamento(parent, dados_anteriores):
         if not selected: return
 
         for item_id in selected:
-            # Pega os valores para subtrair do total
-            valores = tree.item(item_id)['values']
-            subtotal_str = valores[3] # Índice 3 é o subtotal
-            subtotal_float = converter_brl_para_float(subtotal_str)
-            
-            total_geral_float -= subtotal_float
-            
-            # Remove da Treeview
             tree.delete(item_id)
-            
-            # Remove da lista de dados (encontra pelo índice ou descrição - simplificado aqui)
-            # Para simplificar, vamos reconstruir a lista baseado no que sobrou na Treeview
-            pass 
         
-        # Reconstrução segura da lista e total
         lista_itens.clear()
         total_geral_float = 0.0
         
         for child in tree.get_children():
             vals = tree.item(child)['values']
-            # vals = [desc, qtd, unit, subtotal]
+            val_float = converter_brl_para_float(str(vals[1]))
+            
             lista_itens.append({
                 "descricao": vals[0],
-                "qtd": vals[1],
-                "unitario": vals[2],
-                "subtotal": vals[3]
+                "valor": vals[1]
             })
-            total_geral_float += converter_brl_para_float(vals[3])
+            total_geral_float += val_float
 
         lbl_total.config(text=f"TOTAL GERAL: {formatar_moeda(total_geral_float)}")
 
     def finalizar():
-        # Adiciona os dados novos ao dicionário principal
         dados_anteriores["ITENS_ORCAMENTO"] = lista_itens
         dados_anteriores["VALOR_TOTAL_PROPOSTA"] = formatar_moeda(total_geral_float)
-        
         win.destroy()
 
-    # Botões de Ação
+    # Botões
     btn_add = ttk.Button(f_input, text="Adicionar (+)", command=adicionar_item)
-    btn_add.grid(row=1, column=3, sticky="ew", padx=10)
+    btn_add.grid(row=1, column=2, padx=10, sticky="ew")
     
     btn_remove = ttk.Button(f_lista, text="Remover Item Selecionado", command=remover_item)
     btn_remove.pack(pady=5, anchor="e")
@@ -396,7 +347,6 @@ def janela_itens_orcamento(parent, dados_anteriores):
 
     parent.wait_window(win)
     return dados_anteriores
-
     # --- NOVA FUNÇÃO: JANELA DE ESCOPO ESTRUTURAL ---
 def janela_projeto_estrutural(parent, dados_anteriores):
     """
@@ -411,7 +361,7 @@ def janela_projeto_estrutural(parent, dados_anteriores):
 
     # --- CABEÇALHO ---
     ttk.Label(win, text="Definição do Escopo Estrutural", font=("Arial", 14, "bold")).pack(pady=10)
-    ttk.Label(win, text="Adicione os itens que farão parte da entrega (ex: Memória de Cálculo, ART, etc).", font=("Arial", 9)).pack()
+    ttk.Label(win, text="Adicione os itens que farão parte da proposta comercial.", font=("Arial", 9)).pack()
 
     # --- ÁREA DE INSERÇÃO ---
     f_input = ttk.LabelFrame(win, text="Novo Item do Escopo", padding=10)
