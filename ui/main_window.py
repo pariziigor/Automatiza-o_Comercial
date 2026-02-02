@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from services import reader, parser, generator
 from ui.dialogs import janela_verificacao_unificada, janela_itens_orcamento, janela_projeto_estrutural
+from datetime import datetime
 class GeradorPropostasApp:
     def __init__(self, root):
         self.root = root
@@ -14,7 +15,6 @@ class GeradorPropostasApp:
         self.path_faturamento = tk.StringVar()
         
         # --- VARIÁVEIS DE OPÇÃO ---
-        self.var_frete = tk.StringVar(value="CIF - Por conta do destinatário")
         self.dados_finais = {}
         
         self._setup_ui()
@@ -28,16 +28,6 @@ class GeradorPropostasApp:
         self._criar_seletor(f_arquivos, "Ficha Solicitante:", self.path_solicitante, 1)
         self._criar_seletor(f_arquivos, "Ficha Faturamento (Opcional):", self.path_faturamento, 2)
         ttk.Label(f_arquivos, text="(Deixe vazio se for o mesmo)", font=("Arial", 8, "italic")).grid(row=3, column=1, sticky="w", padx=5)
-
-        # --- FRAME DE OPÇÕES (Frete + Pagamento) ---
-        f_opcoes = ttk.LabelFrame(self.root, text="Opções da Proposta", padding=10)
-        f_opcoes.pack(fill="x", padx=10, pady=5)
-        
-        # 1. Frete
-        ttk.Label(f_opcoes, text="Tipo de Frete:").grid(row=0, column=0, sticky="w", pady=5)
-        opcoes_frete = ["CIF - Por conta do destinatário", "FOB - Por conta do Cliente"]
-        c_frete = ttk.Combobox(f_opcoes, textvariable=self.var_frete, values=opcoes_frete, state="readonly", width=35)
-        c_frete.grid(row=0, column=1, padx=10, pady=5)
         
         # Botão Ação
         self.btn_processar = ttk.Button(self.root, text="INICIAR PROCESSO", command=self.fluxo_principal, state="disabled")
@@ -93,7 +83,6 @@ class GeradorPropostasApp:
                 self.root, 
                 placeholders, 
                 dados_auto, 
-                self.var_frete.get(),
             )
             
             if not dados_revisados:
@@ -120,6 +109,25 @@ class GeradorPropostasApp:
             if "ITENS_ORCAMENTO" not in dados_finais:
                  dados_finais["ITENS_ORCAMENTO"] = []
                  dados_finais["VALOR_TOTAL_PROPOSTA"] = "R$ 0,00"
+
+            # ==========================================================
+            # --- NOVO: GERAR DATA AUTOMÁTICA ---
+            # ==========================================================
+            
+            # 1. Pega o momento atual
+            agora = datetime.now()
+            
+            # 2. Lista de meses em português 
+            meses = [
+                'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+            ]
+            
+            # 3. Formata: "02 de fevereiro de 2026"
+            data_extenso = f"{agora.day} de {meses[agora.month - 1]} de {agora.year}"
+            
+            # 4. Salva no dicionário para o Word usar
+            dados_finais["DATA_HOJE"] = data_extenso
 
             # 6. Geração Final
             self.log("6. Gerando documentos finais...")

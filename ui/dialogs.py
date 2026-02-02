@@ -50,8 +50,8 @@ def obter_prioridade(campo):
 
 # --- JANELA PRINCIPAL ATUALIZADA ---
 
-def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, valor_frete_inicial):
-    # ^^^ REMOVIDO argumento valor_pagamento_inicial da linha acima
+def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
+    # REMOVIDO argumento valor_frete_inicial ^
     
     win = tk.Toplevel(parent)
     win.title("Conferência Geral dos Dados")
@@ -62,14 +62,13 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     widgets_texto = {}
     widgets_servicos = {}
     
-    var_frete = tk.StringVar(value=valor_frete_inicial)
-    # REMOVIDO var_pagamento
+    # --- CRIAÇÃO LOCAL DA VARIÁVEL DE FRETE ---
+    var_frete = tk.StringVar(value="CIF - Por conta do destinatário")
 
     # --- CABEÇALHO ---
     f_header = ttk.Frame(win, padding=15)
     f_header.pack(fill="x")
     ttk.Label(f_header, text="Revise os dados", font=("Arial", 14, "bold")).pack(anchor="w")
-    ttk.Label(f_header, text="Redimensione a janela para ajustar os campos.", font=("Arial", 9), foreground="gray").pack(anchor="w")
 
     # --- SCROLL ---
     container = ttk.Frame(win)
@@ -102,7 +101,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
         lbl.grid(row=row_idx[0], column=0, columnspan=5, sticky="w", pady=(0, 10))
         row_idx[0] += 1
 
-    # 1. OPÇÕES
+    # 1. OPÇÕES (AGORA CONTÉM O FRETE AQUI)
     add_separator("1. OPÇÕES DA PROPOSTA", "#444")
     
     ttk.Label(scrollable_frame, text="Tipo de Frete:").grid(row=row_idx[0], column=0, sticky="w", padx=5)
@@ -110,8 +109,6 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     c_frete = ttk.Combobox(scrollable_frame, textvariable=var_frete, values=opcoes_frete, state="readonly")
     c_frete.grid(row=row_idx[0], column=1, sticky="ew", padx=5)
     row_idx[0] += 1
-    
-    # REMOVIDO CAMPO DE PAGAMENTO DAQUI
 
     # 2. SERVIÇOS
     lista_servicos = sorted([p for p in todos_placeholders if p.startswith("X_")])
@@ -139,11 +136,12 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
                 row_chk += 1
 
     # 3. CAMPOS DE TEXTO
-    
+    # Mantém TIPO_FRETE na lista negra para não duplicar
     campos_ignorados = [
-        "TIPO_FRETE", "VALOR_TOTAL_PROPOSTA", # Removido CONDICOES_PAGAMENTO daqui
+        "TIPO_FRETE", "VALOR_TOTAL_PROPOSTA", 
         "ITENS_ORCAMENTO", "ITENS_ESTRUTURAL",
-        "item", "item.descricao", "item.valor", "item.qtd", "item.subtotal"
+        "item", "item.descricao", "item.valor", "item.qtd", "item.subtotal",
+        "DATA_HOJE"
     ]
 
     todos_campos_texto = [
@@ -189,8 +187,8 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos, va
     desenhar_campos_lado_a_lado(grupo_contratante, "5. DADOS DE FATURAMENTO", "#cc5500")
 
     def confirmar():
+        # Salva o valor do frete escolhido nesta janela
         resultado_final["TIPO_FRETE"] = var_frete.get()
-        # REMOVIDO: resultado_final["CONDICOES_PAGAMENTO"] = ...
         
         for k, v in widgets_servicos.items():
             resultado_final[k] = "X" if v.get() else ""
