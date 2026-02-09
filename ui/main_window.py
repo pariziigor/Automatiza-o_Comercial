@@ -16,14 +16,15 @@ class GeradorPropostasApp:
 
         # 2. Define as variáveis JÁ COM OS VALORES SALVOS
         # O segundo argumento do .get() é o valor padrão (vazio) se não tiver nada salvo
-        self.path_modelo = tk.StringVar(value=config.get("modelo", ""))
-        self.path_solicitante = tk.StringVar(value=config.get("solicitante", ""))
-        self.path_faturamento = tk.StringVar(value=config.get("faturamento", ""))
-        self.path_saida = tk.StringVar(value=config.get("saida", "")) # <--- AQUI A MÁGICA
+        self.path_modelo = tk.StringVar() 
+        self.path_solicitante = tk.StringVar()
+        self.path_faturamento = tk.StringVar()
+        self.path_saida = tk.StringVar(value=config.get("saida", "")) 
         
         self.dados_finais = {}
         
         self._setup_ui()
+
     def _setup_ui(self):
         # Frame Arquivos
         f_arquivos = ttk.LabelFrame(self.root, text="Arquivos e Pastas", padding=10)
@@ -35,13 +36,12 @@ class GeradorPropostasApp:
         self._criar_seletor(f_arquivos, "Ficha Faturamento (Opcional):", self.path_faturamento, 2)
         ttk.Label(f_arquivos, text="(Deixe vazio se for o mesmo)", font=("Arial", 8, "italic")).grid(row=3, column=1, sticky="w", padx=5)
 
-        # --- NOVO: Seletor de Pasta de Saída ---
+        # --- Seletor de Pasta de Saída ---
         ttk.Separator(f_arquivos, orient='horizontal').grid(row=4, column=0, columnspan=3, sticky="ew", pady=10)
         
         ttk.Label(f_arquivos, text="Salvar em:").grid(row=5, column=0, sticky="w", pady=5)
         ttk.Entry(f_arquivos, textvariable=self.path_saida, width=45).grid(row=5, column=1, padx=5, pady=5)
         ttk.Button(f_arquivos, text="Selecionar Pasta", command=self._buscar_pasta).grid(row=5, column=2, pady=5)
-        # ---------------------------------------
 
         # Botão Ação
         self.btn_processar = ttk.Button(self.root, text="INICIAR PROCESSO", command=self.fluxo_principal, state="disabled")
@@ -60,7 +60,6 @@ class GeradorPropostasApp:
         path = filedialog.askopenfilename()
         if path:
             var_target.set(path)
-            self._salvar_config() # <--- SALVA AUTOMATICAMENTE
             
             if self.path_modelo.get() and self.path_solicitante.get():
                 self.btn_processar.config(state="normal")
@@ -92,9 +91,6 @@ class GeradorPropostasApp:
     def _salvar_config(self):
         """Salva os caminhos atuais no arquivo config.json."""
         dados = {
-            "modelo": self.path_modelo.get(),
-            "solicitante": self.path_solicitante.get(),
-            "faturamento": self.path_faturamento.get(),
             "saida": self.path_saida.get()
         }
         with open("config.json", "w") as f:

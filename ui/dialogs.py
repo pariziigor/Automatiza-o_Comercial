@@ -48,10 +48,7 @@ def obter_prioridade(campo):
     except ValueError:
         return 999
 
-# --- JANELA PRINCIPAL ATUALIZADA ---
-
 def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
-    # REMOVIDO argumento valor_frete_inicial ^
     
     win = tk.Toplevel(parent)
     win.title("Conferência Geral dos Dados")
@@ -101,7 +98,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
         lbl.grid(row=row_idx[0], column=0, columnspan=5, sticky="w", pady=(0, 10))
         row_idx[0] += 1
 
-    # 1. OPÇÕES (AGORA CONTÉM O FRETE AQUI)
+    # 1. OPÇÕES
     add_separator("1. OPÇÕES DA PROPOSTA", "#444")
     
     ttk.Label(scrollable_frame, text="Tipo de Frete:").grid(row=row_idx[0], column=0, sticky="w", padx=5)
@@ -203,7 +200,6 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
     parent.wait_window(win)
     return resultado_final
 
-# --- NOVA FUNÇÃO: JANELA DE ORÇAMENTO ---
 # --- FUNÇÃO: JANELA DE ORÇAMENTO (SIMPLIFICADA - SEM QUANTIDADE) ---
 def janela_itens_orcamento(parent, dados_anteriores):
     """
@@ -226,7 +222,6 @@ def janela_itens_orcamento(parent, dados_anteriores):
     f_input.columnconfigure(0, weight=1)
 
     # Linha 1: Labels
-    # --- AQUI FOI FEITA A ALTERAÇÃO SOLICITADA ---
     ttk.Label(f_input, text="Descrição:").grid(row=0, column=0, sticky="w")
     
     ttk.Label(f_input, text="Valor (R$):").grid(row=0, column=1, sticky="w", padx=10)
