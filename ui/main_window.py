@@ -121,15 +121,17 @@ class GeradorPropostasApp:
             # 2. Estrutural
             self.log("4. Aguardando escopo estrutural (Passo 2/3)...")
             dados_com_estrutural = janela_projeto_estrutural(self.root, dados_revisados)
-            if "ITENS_ESTRUTURAL" not in dados_com_estrutural: dados_com_estrutural["ITENS_ESTRUTURAL"] = []
+            if "ITENS_ESTRUTURAL" not in dados_com_estrutural:
+                self.log("Processo cancelado pelo usuário na etapa estrutural.")
+                return
 
             # 3. Orçamento
             self.log("5. Aguardando composição do orçamento (Passo 3/3)...")
             dados_finais = janela_itens_orcamento(self.root, dados_com_estrutural)
             
             if "ITENS_ORCAMENTO" not in dados_finais:
-                 dados_finais["ITENS_ORCAMENTO"] = []
-                 dados_finais["VALOR_TOTAL_PROPOSTA"] = "R$ 0,00"
+                 self.log("Processo cancelado pelo usuário na etapa de orçamento.")
+                 return
 
             # Data Automática
             agora = datetime.now()

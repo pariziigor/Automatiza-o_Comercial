@@ -200,7 +200,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
     parent.wait_window(win)
     return resultado_final
 
-# --- FUNÇÃO: JANELA DE ORÇAMENTO (SIMPLIFICADA - SEM QUANTIDADE) ---
+# --- FUNÇÃO: JANELA DE ORÇAMENTO ---
 def janela_itens_orcamento(parent, dados_anteriores):
     """
     Janela para inserir itens e valores (Simplificada).
@@ -340,7 +340,7 @@ def janela_itens_orcamento(parent, dados_anteriores):
 
     parent.wait_window(win)
     return dados_anteriores
-    # --- NOVA FUNÇÃO: JANELA DE ESCOPO ESTRUTURAL ---
+
 def janela_projeto_estrutural(parent, dados_anteriores):
     """
     Janela para inserir os itens do Escopo do Projeto (Texto livre).
@@ -375,7 +375,7 @@ def janela_projeto_estrutural(parent, dados_anteriores):
     tree = ttk.Treeview(f_lista, columns=columns, show="headings", height=10)
     
     tree.heading("desc", text="Itens Adicionados")
-    tree.column("desc", width=800, anchor="w") # Coluna larga
+    tree.column("desc", width=800, anchor="w") 
 
     scrollbar = ttk.Scrollbar(f_lista, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
@@ -411,7 +411,6 @@ def janela_projeto_estrutural(parent, dados_anteriores):
 
         # Remove da lista de dados e da árvore
         for item_id in selected:
-            # Precisamos achar o índice para remover da lista 'lista_itens_estrutural'
             # Como a Treeview insere em ordem, o índice visual (index) geralmente bate com o da lista
             idx = tree.index(item_id)
             if idx < len(lista_itens_estrutural):
@@ -431,7 +430,7 @@ def janela_projeto_estrutural(parent, dados_anteriores):
     f_footer.pack(fill="x")
     
     ttk.Button(f_footer, text="Remover Selecionado", command=remover_item).pack(side="left")
-    ttk.Button(f_footer, text="CONCLUIR TUDO E GERAR PDF", command=finalizar).pack(side="right", ipady=10)
+    ttk.Button(f_footer, text="CONCLUIR TUDO E SEGUIR", command=finalizar).pack(side="right", ipady=10)
 
     parent.wait_window(win)
     return dados_anteriores
