@@ -1,5 +1,6 @@
 import os
 import pdfplumber
+import re
 from docx import Document
 
 def ler_documento_cliente(filepath):
@@ -31,20 +32,44 @@ def ler_documento_cliente(filepath):
             
     return texto
 
-def extrair_placeholders_modelo(doc_path):
-    """Lê o template Word e identifica {{Variaveis}}."""
-    import re
-    doc = Document(doc_path)
-    texto_completo = ""
-    
+def extrair_placeholders_modelo(docx_path):
+    #Lê o arquivo Word e retorna uma LISTA de placeholders na ordem exata em que aparecem.
+    #Remove duplicatas mantendo a primeira ocorrência.
+    doc = Document(docx_path)
+    placeholders_ordenados = []
+    seen = set()
+
+    # Regex para capturar {{ variavel }}
+    # Aceita espaços dentro: {{ NOME }} ou {{NOME}}
+    regex = r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}"
+
+    def processar_texto(texto):
+        matches = re.findall(regex, texto)
+        for match in matches:
+            if match not in seen:
+                seen.add(match)
+                placeholders_ordenados.append(match)
+
+    # 1. Varre parágrafos do corpo principal
     for para in doc.paragraphs:
-        texto_completo += para.text + "\n"
-        
+        processar_texto(para.text)
+
+    # 2. Varre todas as tabelas (linha por linha, célula por célula)
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                texto_completo += cell.text + "\n"
-    
-    pattern = r"\{\{(.*?)\}\}"
-    matches = re.findall(pattern, texto_completo)
-    return set([m.strip() for m in matches])
+                for para in cell.paragraphs:
+                    processar_texto(para.text)
+                    
+    # 3. Varre Cabeçalhos e Rodapés (Opcional, mas recomendado)
+    for section in doc.sections:
+        for header in [section.header, section.first_page_header, section.even_page_header]:
+            if header:
+                for para in header.paragraphs:
+                    processar_texto(para.text)
+        for footer in [section.footer, section.first_page_footer, section.even_page_footer]:
+            if footer:
+                for para in footer.paragraphs:
+                    processar_texto(para.text)
+
+    return placeholders_ordenados

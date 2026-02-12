@@ -30,12 +30,9 @@ def aplicar_estilo_tabela():
 
 # --- JANELA 1: REVISÃO DE DADOS ---
 def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
-    # Configura janela como Toplevel do CustomTkinter
     win = ctk.CTkToplevel(parent)
     win.title("Conferência Geral dos Dados")
-    win.geometry("900x700")
-    
-    # Garante que a janela fique no topo e em foco
+    win.geometry("950x750")
     win.lift()
     win.focus_force()
     
@@ -48,7 +45,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
 
     # Cabeçalho
     ctk.CTkLabel(win, text="Revise os dados abaixo", font=("Roboto", 20, "bold")).pack(pady=(20, 5), padx=20, anchor="w")
-    ctk.CTkLabel(win, text="Campos vazios serão removidos do documento.", text_color="gray").pack(pady=(0, 10), padx=20, anchor="w")
+    ctk.CTkLabel(win, text="Você pode editar os campos livremente.", text_color="gray").pack(pady=(0, 10), padx=20, anchor="w")
 
     # --- ÁREA DE ROLAGEM ---
     scroll_frame = ctk.CTkScrollableFrame(win)
@@ -89,7 +86,6 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
         row = 0
         for servico in lista_servicos:
             nome_bonito = servico.replace("X_", "").replace("_", " ").title()
-            # CTkCheckBox
             chk = ctk.CTkCheckBox(f_servicos, text=nome_bonito)
             chk.grid(row=row, column=col, sticky="w", padx=10, pady=10)
             widgets_servicos[servico] = chk
@@ -100,7 +96,6 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
                 row += 1
 
     # 3. CAMPOS DE TEXTO
-    # Lista Negra (Campos para ignorar nesta tela)
     campos_ignorados = [
         "TIPO_FRETE", "VALOR_TOTAL_PROPOSTA", 
         "ITENS_ORCAMENTO", "ITENS_ESTRUTURAL",
@@ -118,39 +113,75 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
     # Grupos
     grupo_solicitante = [p for p in todos_campos_texto if p.endswith("_SOLICITANTE")]
     grupo_contratante = [p for p in todos_campos_texto if p.endswith("_CONTRATANTE")]
-    grupo_outros = [p for p in todos_campos_texto if p not in grupo_solicitante and p not in grupo_contratante]
 
-    # Função para desenhar campos (Input Moderno)
+    grupo_outros = [
+        p for p in todos_campos_texto 
+        if p not in grupo_solicitante and p not in grupo_contratante
+    ]
+
+    # --- FUNÇÃO DE DESENHAR COM TRADUÇÃO DE NOMES ---
     def desenhar_campos(lista, titulo):
         if not lista: return
         add_section_title(titulo)
         
         f_campos = ctk.CTkFrame(scroll_frame, fg_color="transparent")
         f_campos.pack(fill="x")
-        f_campos.grid_columnconfigure(1, weight=1) # Input da esq estica
-        f_campos.grid_columnconfigure(3, weight=1) # Input da dir estica
+        f_campos.grid_columnconfigure(1, weight=1) 
+        f_campos.grid_columnconfigure(3, weight=1) 
+
+        # DICIONÁRIO DE NOMES 
+        mapa_nomes = {
+            "NOME_EMPRESA": "Nome da Empresa / Razão Social",
+            "NOME_CLIENTE": "Nome do Cliente",
+            "CNPJ_CPF": "CNPJ ou CPF",
+            "IE": "Inscrição Estadual (I.E.)",
+            "CEP": "CEP",
+            "ENDERECO": "Endereço Completo",
+            "CELULAR": "Celular / WhatsApp",
+            "EMAIL": "E-mail",
+            "CREA": "Registro CREA / CAU",
+            "ART": "A.R.T.",
+            "RESPONSAVEL_TECNICO": "Responsável Técnico",
+            "NUMERO_PROJETO": "Número do Projeto",
+            "TIPO_OBRA": "Tipo de Obra",
+            "DESCRICAO_DA_OBRA": "Descrição Detalhada da Obra",
+            "ENDERECO_DA_OBRA": "Local da Obra",
+            "ENDERECO_ENTREGA": "Endereço de Entrega",
+            "ARQUIVOS_RECEBIDOS": "Arquivos Recebidos",
+            "BAIRRO": "Bairro",
+            "CIDADE": "Cidade",
+            "DATA_HOJE": "Data de Emissão"
+        }
 
         for i, campo in enumerate(lista):
             valor_auto = dados_extraidos.get(campo, "")
-            texto_label = campo.replace("_SOLICITANTE", "").replace("_CONTRATANTE", "").replace("_", " ").title()
             
-            # Input
+            # Limpa sufixos para buscar no dicionário
+            chave_limpa = campo.replace("_SOLICITANTE", "").replace("_CONTRATANTE", "")
+            
+            # Tenta achar no mapa, se não, formata automático
+            if chave_limpa in mapa_nomes:
+                texto_label = mapa_nomes[chave_limpa]
+            else:
+                texto_label = chave_limpa.replace("_", " ").title()
+            
+            # Criar Input
             ent = ctk.CTkEntry(f_campos)
             if valor_auto:
                 ent.insert(0, valor_auto)
-                # Destaque sutil para campos preenchidos automaticamente
                 ent.configure(placeholder_text="Automático")
             
             widgets_texto[campo] = ent
 
-            # Layout 2 colunas
+            # Layout em 2 colunas
             row = i // 2
-            col_start = (i % 2) * 2 # 0 ou 2
+            col_start = (i % 2) * 2 
             
             ctk.CTkLabel(f_campos, text=texto_label).grid(row=row, column=col_start, sticky="w", padx=5, pady=5)
             ent.grid(row=row, column=col_start+1, sticky="ew", padx=(0, 20), pady=5)
 
-    desenhar_campos(grupo_outros, "3. DADOS GERAIS")
+    # --- CHAMADAS PARA DESENHAR OS CAMPOS ---
+    desenhar_campos(grupo_outros, "3. DADOS GERAIS DO PROJETO")
     desenhar_campos(grupo_solicitante, "4. DADOS DO SOLICITANTE")
     desenhar_campos(grupo_contratante, "5. DADOS DE FATURAMENTO")
 
@@ -159,7 +190,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
         resultado_final["TIPO_FRETE"] = var_frete.get()
         
         for k, chk in widgets_servicos.items():
-            resultado_final[k] = "X" if chk.get() == 1 else "" # CTk checkbox retorna 1/0
+            resultado_final[k] = "X" if chk.get() == 1 else "" 
         
         for k, entry in widgets_texto.items():
             resultado_final[k] = entry.get()
@@ -183,25 +214,21 @@ def janela_projeto_estrutural(parent, dados_anteriores):
 
     lista_itens_estrutural = []
     
-    # Aplica estilo na tabela
     aplicar_estilo_tabela()
 
     ctk.CTkLabel(win, text="Definição do Escopo Estrutural", font=("Roboto", 20, "bold")).pack(pady=(20, 5))
-    ctk.CTkLabel(win, text="Insira os itens de texto livre (ex: ART, Memória de Cálculo).", text_color="gray").pack()
+    ctk.CTkLabel(win, text="Insira os itens de texto livre.", text_color="gray").pack()
 
-    # Área de Inserção
     f_input = ctk.CTkFrame(win)
     f_input.pack(fill="x", padx=20, pady=10)
 
     ctk.CTkLabel(f_input, text="Descrição do Item:").pack(anchor="w", padx=10, pady=(10,0))
     
-    # Caixa de Texto Grande (Multi-line)
     txt_desc = ctk.CTkTextbox(f_input, height=80)
     txt_desc.pack(fill="x", padx=10, pady=5)
-    ctk.CTkLabel(f_input, text="Dica: Use Enter para criar sub-itens ou listas com bolinhas.", font=("Arial", 10), text_color="gray").pack(anchor="w", padx=10)
+    ctk.CTkLabel(f_input, text="Use Enter para criar sub-itens.", font=("Arial", 10), text_color="gray").pack(anchor="w", padx=10)
 
-    # Tabela 
-    f_lista = ctk.CTkFrame(win, fg_color="transparent") # Frame transparente para conter a tabela
+    f_lista = ctk.CTkFrame(win, fg_color="transparent")
     f_lista.pack(fill="both", expand=True, padx=20, pady=5)
 
     columns = ("desc",)
@@ -209,14 +236,12 @@ def janela_projeto_estrutural(parent, dados_anteriores):
     tree.heading("desc", text="Itens Adicionados")
     tree.column("desc", anchor="w")
     
-    # Scrollbar do CTk conectada ao Treeview
     scrollbar = ctk.CTkScrollbar(f_lista, command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
     
     tree.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    # Lógica
     def adicionar_item():
         desc = txt_desc.get("1.0", "end-1c").strip()
         if not desc: return
@@ -224,7 +249,7 @@ def janela_projeto_estrutural(parent, dados_anteriores):
         primeira_linha = desc.split("\n")[0]
         if len(desc.split("\n")) > 1: primeira_linha += " (...)"
             
-        tree.insert("", "end", values=(primeira_linha,), tags=(desc,)) # Guarda texto completo na tag
+        tree.insert("", "end", values=(primeira_linha,), tags=(desc,))
         lista_itens_estrutural.append(desc)
         txt_desc.delete("1.0", "end")
         txt_desc.focus()
@@ -242,7 +267,6 @@ def janela_projeto_estrutural(parent, dados_anteriores):
         dados_anteriores["ITENS_ESTRUTURAL"] = lista_itens_estrutural
         win.destroy()
 
-    # Botões
     btn_add = ctk.CTkButton(f_input, text="Adicionar Item", command=adicionar_item)
     btn_add.pack(anchor="e", padx=10, pady=10)
     
@@ -254,6 +278,7 @@ def janela_projeto_estrutural(parent, dados_anteriores):
 
     parent.wait_window(win)
     return dados_anteriores
+
 
 # --- JANELA 3: ORÇAMENTO ---
 def janela_itens_orcamento(parent, dados_anteriores):
@@ -268,14 +293,12 @@ def janela_itens_orcamento(parent, dados_anteriores):
     
     aplicar_estilo_tabela()
 
-    # Header
     ctk.CTkLabel(win, text="Composição do Orçamento", font=("Roboto", 20, "bold")).pack(pady=(20, 10))
 
-    # Área de Input
     f_input = ctk.CTkFrame(win)
     f_input.pack(fill="x", padx=20, pady=10)
     
-    f_input.grid_columnconfigure(0, weight=1) # Descrição estica
+    f_input.grid_columnconfigure(0, weight=1)
 
     ctk.CTkLabel(f_input, text="Descrição:").grid(row=0, column=0, sticky="w", padx=10, pady=(10,0))
     ctk.CTkLabel(f_input, text="Valor (R$):").grid(row=0, column=1, sticky="w", padx=10, pady=(10,0))
@@ -286,7 +309,6 @@ def janela_itens_orcamento(parent, dados_anteriores):
     entry_valor = ctk.CTkEntry(f_input, width=150)
     entry_valor.grid(row=1, column=1, sticky="ew", padx=10, pady=(0, 10))
     
-    # Tabela
     f_lista = ctk.CTkFrame(win, fg_color="transparent")
     f_lista.pack(fill="both", expand=True, padx=20, pady=5)
 
@@ -303,11 +325,9 @@ def janela_itens_orcamento(parent, dados_anteriores):
     tree.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-    # Rodapé Total
     lbl_total = ctk.CTkLabel(win, text="TOTAL GERAL: R$ 0,00", font=("Roboto", 24, "bold"), text_color="green")
     lbl_total.pack(pady=10)
 
-    # Lógica
     def formatar_moeda(valor_float):
         return f"R$ {valor_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -362,7 +382,6 @@ def janela_itens_orcamento(parent, dados_anteriores):
         dados_anteriores["VALOR_TOTAL_PROPOSTA"] = formatar_moeda(total_geral_float)
         win.destroy()
 
-    # Botões Finais
     btn_add = ctk.CTkButton(f_input, text="Adicionar (+)", command=adicionar_item, width=120)
     btn_add.grid(row=1, column=2, padx=10, pady=(0, 10))
 

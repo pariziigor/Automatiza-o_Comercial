@@ -43,19 +43,22 @@ class GeradorPropostasApp:
         f_arquivos = ctk.CTkFrame(self.root)
         f_arquivos.pack(fill="x", padx=20, pady=10)
         
-        # A MÁGICA DA RESPONSIVIDADE ACONTECE AQUI:
-        # Coluna 0: Labels (fixo)
-        # Coluna 1: Inputs (ESTICA - weight=1)
-        # Coluna 2: Botões (fixo)
         f_arquivos.grid_columnconfigure(1, weight=1) 
 
         # Label descritiva
         ctk.CTkLabel(f_arquivos, text="Arquivos de Entrada", font=("Roboto", 14, "bold")).grid(row=0, column=0, sticky="w", padx=15, pady=10)
 
         # Seletores
+        # Modelo Word (OBRIGATÓRIO)
         self._criar_seletor(f_arquivos, "Modelo Word:", self.path_modelo, 1)
+        
+        # Solicitante (OPCIONAL)
         self._criar_seletor(f_arquivos, "Ficha Solicitante:", self.path_solicitante, 2)
+        ctk.CTkLabel(f_arquivos, text="(Opcional)", text_color="gray").grid(row=2, column=3, sticky="w", padx=(0, 10))
+
+        # Faturamento (OPCIONAL)
         self._criar_seletor(f_arquivos, "Ficha Faturamento:", self.path_faturamento, 3)
+        ctk.CTkLabel(f_arquivos, text="(Opcional)", text_color="gray").grid(row=3, column=3, sticky="w", padx=(0, 10))
         
         ctk.CTkLabel(f_arquivos, text="(Opcional)", text_color="gray").grid(row=3, column=3, sticky="w", padx=(0, 10))
 
@@ -93,7 +96,6 @@ class GeradorPropostasApp:
         # Label
         ctk.CTkLabel(parent, text=label).grid(row=row, column=0, sticky="w", padx=15, pady=5)
         
-        # Entry (Input) - Agora com sticky="ew" para esticar
         # Remoção do width fixo para ele obedecer o layout
         ctk.CTkEntry(parent, textvariable=var).grid(row=row, column=1, sticky="ew", padx=5, pady=5)
         
@@ -105,8 +107,9 @@ class GeradorPropostasApp:
         path = filedialog.askopenfilename()
         if path:
             var_target.set(path)
-            if self.path_modelo.get() and self.path_solicitante.get():
-                self.btn_processar.configure(state="normal") 
+            
+            if self.path_modelo.get():
+                self.btn_processar.configure(state="normal")
     
     def _buscar_pasta(self):
         path = filedialog.askdirectory()
@@ -137,18 +140,28 @@ class GeradorPropostasApp:
                 json.dump(dados, f, indent=4)
         except: pass
 
-    # --- FLUXO PRINCIPAL (CÓDIGO IGUAL AO ANTERIOR) ---
+    # --- FLUXO PRINCIPAL ---
     def fluxo_principal(self):
         try:
             self.log("1. Analisando Modelo...")
             placeholders = reader.extrair_placeholders_modelo(self.path_modelo.get())
             
-            self.log("2. Lendo dados...")
-            txt_solicitante = reader.ler_documento_cliente(self.path_solicitante.get())
-            dados_auto = parser.processar_dados(placeholders, txt_solicitante)
+            # Inicializa vazio
+            dados_auto = {}
 
+            # SÓ TENTA LER SE O USUÁRIO SELECIONOU O ARQUIVO
+            path_sol = self.path_solicitante.get()
+            if path_sol:
+                self.log("2. Lendo dados do Solicitante...")
+                txt_solicitante = reader.ler_documento_cliente(path_sol)
+                dados_auto = parser.processar_dados(placeholders, txt_solicitante)
+            else:
+                self.log("2. Ficha Solicitante não informada. Preenchimento manual...")
+
+            # Faturamento 
             path_fat = self.path_faturamento.get()
             if path_fat:
+                self.log("Lendo dados de Faturamento...")
                 txt_fat = reader.ler_documento_cliente(path_fat)
                 dados_fat = parser.processar_dados(placeholders, txt_fat, sufixo_filtro="_CONTRATANTE")
                 dados_auto.update(dados_fat)
