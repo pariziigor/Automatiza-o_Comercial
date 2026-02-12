@@ -1,6 +1,8 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk, messagebox
+import requests
+import threading
 
 # --- CONFIGURAÇÃO DE ESTILO PARA A TABELA (Treeview) ---
 def aplicar_estilo_tabela():
@@ -30,9 +32,12 @@ def aplicar_estilo_tabela():
 
 # --- JANELA 1: REVISÃO DE DADOS ---
 def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
+    # Configura janela como Toplevel do CustomTkinter
     win = ctk.CTkToplevel(parent)
     win.title("Conferência Geral dos Dados")
     win.geometry("950x750")
+    
+    # Garante que a janela fique no topo e em foco
     win.lift()
     win.focus_force()
     
@@ -45,7 +50,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
 
     # Cabeçalho
     ctk.CTkLabel(win, text="Revise os dados abaixo", font=("Roboto", 20, "bold")).pack(pady=(20, 5), padx=20, anchor="w")
-    ctk.CTkLabel(win, text="Você pode editar os campos livremente.", text_color="gray").pack(pady=(0, 10), padx=20, anchor="w")
+    ctk.CTkLabel(win, text="Digite o CNPJ e clique na lupa para preencher automático.", text_color="gray").pack(pady=(0, 10), padx=20, anchor="w")
 
     # --- ÁREA DE ROLAGEM ---
     scroll_frame = ctk.CTkScrollableFrame(win)
@@ -113,23 +118,123 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
     # Grupos
     grupo_solicitante = [p for p in todos_campos_texto if p.endswith("_SOLICITANTE")]
     grupo_contratante = [p for p in todos_campos_texto if p.endswith("_CONTRATANTE")]
+    grupo_outros = [p for p in todos_campos_texto if p not in grupo_solicitante and p not in grupo_contratante]
 
-    grupo_outros = [
-        p for p in todos_campos_texto 
-        if p not in grupo_solicitante and p not in grupo_contratante
-    ]
+    # --- FUNÇÃO DE BUSCA INTELIGENTE (CASCATA VS ESPECÍFICO) ---
+    def buscar_cnpj_api(entry_cnpj, contexto):
+        """
+        contexto="SOLICITANTE": Preenche Solicitante E Faturamento (padrão).
+        contexto="FATURAMENTO": Preenche APENAS Faturamento (não toca no solicitante).
+        """
+        # Limpa o CNPJ
+        cnpj_limpo = entry_cnpj.get().replace(".", "").replace("/", "").replace("-", "").strip()
+        
+        if len(cnpj_limpo) != 14:
+            messagebox.showwarning("Aviso", "O CNPJ deve ter exatamente 14 números.")
+            return
 
-    # --- FUNÇÃO DE DESENHAR COM TRADUÇÃO DE NOMES ---
+        def task():
+            try:
+                # Usa a ReceitaWS
+                url = f"https://www.receitaws.com.br/v1/cnpj/{cnpj_limpo}"
+                
+                # Header para simular um navegador
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+                
+                response = requests.get(url, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    dados = response.json()
+                    
+                    if dados.get('status') == 'ERROR':
+                        msg_erro = dados.get('message', 'CNPJ inválido ou não encontrado.')
+                        win.after(0, lambda: messagebox.showerror("Erro", msg_erro))
+                        return
+
+                    # Mapeamento
+                    mapeamento = {
+                        "nome": ["NOME_EMPRESA", "RAZAO_SOCIAL"], # Removido CLIENTE para evitar conflito
+                        "fantasia": ["NOME_FANTASIA"],
+                        "cep": ["CEP"],
+                        "municipio": ["CIDADE", "MUNICIPIO"],
+                        "uf": ["UF", "ESTADO"],
+                        "email": ["EMAIL"],
+                        "telefone": ["TELEFONE", "CELULAR", "WHATSAPP"],
+                        "bairro": ["BAIRRO"]
+                    }
+                    
+                    # Endereço
+                    logradouro = dados.get('logradouro', '')
+                    numero = dados.get('numero', '')
+                    comp = dados.get('complemento', '')
+                    
+                    endereco_full = f"{logradouro}, {numero}"
+                    if comp:
+                        endereco_full += f" - {comp}"
+
+                    # Atualiza a interface
+                    def atualizar_gui():
+                        count_preenchidos = 0
+                        
+                        for campo_word, entry_widget in widgets_texto.items():
+                            campo_upper = campo_word.upper()
+
+                            # --- FILTRO DE CONTEXTO ---
+                            # Se clicou na lupa do FATURAMENTO, ignora campos que não sejam Contratante
+                            if contexto == "FATURAMENTO":
+                                if "CONTRATANTE" not in campo_upper:
+                                    continue
+                            
+                            # --- FILTRO DE ENDEREÇO (Proteção contra Obra/Entrega) ---
+                            if "ENDERECO" in campo_upper:
+                                if "OBRA" not in campo_upper and "ENTREGA" not in campo_upper:
+                                    entry_widget.delete(0, "end")
+                                    entry_widget.insert(0, endereco_full)
+                                    count_preenchidos += 1
+                                continue
+
+                            # --- OUTROS CAMPOS ---
+                            for chave_api, lista_possiveis in mapeamento.items():
+                                for possivel in lista_possiveis:
+                                    if possivel in campo_upper:
+                                        # Proteção extra: Não preencher NOME_CLIENTE com Razão Social
+                                        if "CLIENTE" in campo_upper and chave_api == "nome":
+                                            continue 
+
+                                        valor = dados.get(chave_api)
+                                        if valor:
+                                            entry_widget.delete(0, "end")
+                                            entry_widget.insert(0, str(valor))
+                                            count_preenchidos += 1
+                        
+                        nome_exibicao = dados.get('fantasia') or dados.get('nome')
+                        messagebox.showinfo("Sucesso", f"Empresa encontrada!\n{nome_exibicao}\n({count_preenchidos} campos atualizados)")
+
+                    win.after(0, atualizar_gui)
+                else:
+                    win.after(0, lambda: messagebox.showerror("Erro", f"Erro no servidor: Código {response.status_code}"))
+            
+            except Exception as e:
+                win.after(0, lambda: messagebox.showerror("Erro de Conexão", f"Falha ao buscar dados:\n{str(e)}"))
+
+        threading.Thread(target=task, daemon=True).start()
+
+
+    # --- FUNÇÃO DE DESENHAR ---
     def desenhar_campos(lista, titulo):
         if not lista: return
         add_section_title(titulo)
         
+        # Cria o frame onde os inputs vão ficar
         f_campos = ctk.CTkFrame(scroll_frame, fg_color="transparent")
-        f_campos.pack(fill="x")
+        f_campos.pack(fill="x", pady=5)
+        
         f_campos.grid_columnconfigure(1, weight=1) 
         f_campos.grid_columnconfigure(3, weight=1) 
 
-        # DICIONÁRIO DE NOMES 
+        # Dicionário de Nomes
         mapa_nomes = {
             "NOME_EMPRESA": "Nome da Empresa / Razão Social",
             "NOME_CLIENTE": "Nome do Cliente",
@@ -144,43 +249,53 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
             "RESPONSAVEL_TECNICO": "Responsável Técnico",
             "NUMERO_PROJETO": "Número do Projeto",
             "TIPO_OBRA": "Tipo de Obra",
-            "DESCRICAO_DA_OBRA": "Descrição Detalhada da Obra",
+            "DESCRICAO_DA_OBRA": "Descrição Detalhada",
             "ENDERECO_DA_OBRA": "Local da Obra",
-            "ENDERECO_ENTREGA": "Endereço de Entrega",
             "ARQUIVOS_RECEBIDOS": "Arquivos Recebidos",
-            "BAIRRO": "Bairro",
-            "CIDADE": "Cidade",
             "DATA_HOJE": "Data de Emissão"
         }
 
         for i, campo in enumerate(lista):
             valor_auto = dados_extraidos.get(campo, "")
             
-            # Limpa sufixos para buscar no dicionário
             chave_limpa = campo.replace("_SOLICITANTE", "").replace("_CONTRATANTE", "")
+            texto_label = mapa_nomes.get(chave_limpa, chave_limpa.replace("_", " ").title())
             
-            # Tenta achar no mapa, se não, formata automático
-            if chave_limpa in mapa_nomes:
-                texto_label = mapa_nomes[chave_limpa]
-            else:
-                texto_label = chave_limpa.replace("_", " ").title()
-            
-            # Criar Input
-            ent = ctk.CTkEntry(f_campos)
-            if valor_auto:
-                ent.insert(0, valor_auto)
-                ent.configure(placeholder_text="Automático")
-            
-            widgets_texto[campo] = ent
-
-            # Layout em 2 colunas
             row = i // 2
             col_start = (i % 2) * 2 
             
             ctk.CTkLabel(f_campos, text=texto_label).grid(row=row, column=col_start, sticky="w", padx=5, pady=5)
-            ent.grid(row=row, column=col_start+1, sticky="ew", padx=(0, 20), pady=5)
+            
+            # --- INPUT ---
+            if "CNPJ" in campo.upper():
+                # Frame especial para CNPJ
+                f_cnpj = ctk.CTkFrame(f_campos, fg_color="transparent")
+                f_cnpj.grid(row=row, column=col_start+1, sticky="ew", padx=(0, 20), pady=5)
+                
+                ent = ctk.CTkEntry(f_cnpj)
+                if valor_auto: ent.insert(0, valor_auto)
+                ent.pack(side="left", fill="x", expand=True)
+                
+                # --- DEFINE O CONTEXTO DO BOTÃO ---
+                if "CONTRATANTE" in campo.upper():
+                    tipo_busca = "FATURAMENTO"
+                else:
+                    tipo_busca = "SOLICITANTE"
 
-    # --- CHAMADAS PARA DESENHAR OS CAMPOS ---
+                btn_lupa = ctk.CTkButton(f_cnpj, text="🔍", width=40, fg_color="#3B8ED0", 
+                                       command=lambda e=ent, t=tipo_busca: buscar_cnpj_api(e, t))
+                btn_lupa.pack(side="right", padx=(5, 0))
+                
+                widgets_texto[campo] = ent
+            else:
+                # Campo Normal
+                ent = ctk.CTkEntry(f_campos)
+                if valor_auto: ent.insert(0, valor_auto)
+                ent.grid(row=row, column=col_start+1, sticky="ew", padx=(0, 20), pady=5)
+                
+                widgets_texto[campo] = ent
+
+    # --- CHAMADAS ESSENCIAIS ---
     desenhar_campos(grupo_outros, "3. DADOS GERAIS DO PROJETO")
     desenhar_campos(grupo_solicitante, "4. DADOS DO SOLICITANTE")
     desenhar_campos(grupo_contratante, "5. DADOS DE FATURAMENTO")
