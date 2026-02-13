@@ -4,19 +4,21 @@ from tkinter import filedialog, messagebox, ttk
 from datetime import datetime
 import json
 import os
+from services.utils import resource_path
 import threading
 from services import reader, parser, generator
 from ui.dialogs import janela_verificacao_unificada, janela_itens_orcamento, janela_projeto_estrutural
 
-# Configuração Global do Tema
-ctk.set_appearance_mode("Dark")  # Modos: "System" (padrão), "Dark", "Light"
-ctk.set_default_color_theme("blue")  # Temas: "blue" (padrão), "green", "dark-blue"
-
 class GeradorPropostasApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Gerador de Propostas Moderno")
+        self.root.title("Gerador de Propostas Comerciais - AULEVI")
         self.root.geometry("700x600")
+
+        try:
+            self.root.iconbitmap(resource_path("icone.ico"))
+        except:
+            pass
         
         # Configuração inicial
         config = self._carregar_config()
@@ -37,7 +39,7 @@ class GeradorPropostasApp:
         self.root.grid_rowconfigure(2, weight=1)
 
         # Título
-        lbl_titulo = ctk.CTkLabel(self.root, text="Gerador de Propostas", font=("Roboto", 24, "bold"))
+        lbl_titulo = ctk.CTkLabel(self.root, text="Gerador de Propostas - AULEVI", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
         # --- FRAME DE ARQUIVOS ---
