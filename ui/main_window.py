@@ -4,6 +4,7 @@ from tkinter import filedialog, messagebox, ttk
 from datetime import datetime
 import json
 import os
+import threading
 from services import reader, parser, generator
 from ui.dialogs import janela_verificacao_unificada, janela_itens_orcamento, janela_projeto_estrutural
 
@@ -31,11 +32,11 @@ class GeradorPropostasApp:
         self._setup_ui()
 
     def _setup_ui(self):
-        # Configuração do Grid da Janela Principal (para garantir que tudo estique)
+        # Configuração do Grid
         self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_rowconfigure(2, weight=1) # A linha do Log vai crescer
+        self.root.grid_rowconfigure(2, weight=1)
 
-        # Título Principal
+        # Título
         lbl_titulo = ctk.CTkLabel(self.root, text="Gerador de Propostas", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
@@ -45,33 +46,24 @@ class GeradorPropostasApp:
         
         f_arquivos.grid_columnconfigure(1, weight=1) 
 
-        # Label descritiva
+        # Inputs
         ctk.CTkLabel(f_arquivos, text="Arquivos de Entrada", font=("Roboto", 14, "bold")).grid(row=0, column=0, sticky="w", padx=15, pady=10)
 
-        # Seletores
-        # Modelo Word (OBRIGATÓRIO)
         self._criar_seletor(f_arquivos, "Modelo Word:", self.path_modelo, 1)
         
-        # Solicitante (OPCIONAL)
         self._criar_seletor(f_arquivos, "Ficha Solicitante:", self.path_solicitante, 2)
         ctk.CTkLabel(f_arquivos, text="(Opcional)", text_color="gray").grid(row=2, column=3, sticky="w", padx=(0, 10))
 
-        # Faturamento (OPCIONAL)
         self._criar_seletor(f_arquivos, "Ficha Faturamento:", self.path_faturamento, 3)
         ctk.CTkLabel(f_arquivos, text="(Opcional)", text_color="gray").grid(row=3, column=3, sticky="w", padx=(0, 10))
-        
-        ctk.CTkLabel(f_arquivos, text="(Opcional)", text_color="gray").grid(row=3, column=3, sticky="w", padx=(0, 10))
 
-        # Divisória
+        # Divisória e Saída
         div = ctk.CTkFrame(f_arquivos, height=2, fg_color="gray30")
         div.grid(row=4, column=0, columnspan=4, sticky="ew", pady=15, padx=10)
         
-        # Seletor de Pasta de Saída
         ctk.CTkLabel(f_arquivos, text="Salvar em:").grid(row=5, column=0, sticky="w", padx=15)
-        
         entry_saida = ctk.CTkEntry(f_arquivos, textvariable=self.path_saida)
-        entry_saida.grid(row=5, column=1, sticky="ew", padx=5, pady=5) # sticky="ew" estica horizontalmente
-        
+        entry_saida.grid(row=5, column=1, sticky="ew", padx=5, pady=5)
         ctk.CTkButton(f_arquivos, text="Selecionar", width=100, command=self._buscar_pasta).grid(row=5, column=2, padx=15)
 
         # --- BOTÃO DE AÇÃO ---
@@ -87,10 +79,24 @@ class GeradorPropostasApp:
         )
         self.btn_processar.pack(fill="x", padx=20, pady=20)
         
-        # --- LOG ---
+        # --- 1. CRIAMOS O LOG PRIMEIRO (CORREÇÃO AQUI) ---
         self.log_text = ctk.CTkTextbox(self.root)
         self.log_text.pack(fill="both", expand=True, padx=20, pady=(0, 20))
         self.log_text.configure(state="disabled")
+
+        # --- 2. CRIAMOS A BARRA E POSICIONAMOS 'BEFORE' O LOG ---
+        # Label de Porcentagem
+        self.lbl_progresso = ctk.CTkLabel(self.root, text="", text_color="orange")
+        self.lbl_progresso.pack(before=self.log_text, pady=(0, 5)) # 'before' agora funciona porque log_text existe
+        
+        # Barra Determinada
+        self.bar_progresso = ctk.CTkProgressBar(self.root, mode="determinate", height=15)
+        self.bar_progresso.set(0)
+        self.bar_progresso.pack(before=self.log_text, fill="x", padx=50, pady=(0, 20))
+        
+        # Esconde inicialmente
+        self.lbl_progresso.pack_forget()
+        self.bar_progresso.pack_forget()
 
     def _criar_seletor(self, parent, label, var, row):
         # Label
@@ -143,13 +149,11 @@ class GeradorPropostasApp:
     # --- FLUXO PRINCIPAL ---
     def fluxo_principal(self):
         try:
+            # --- PREPARAÇÃO (RÁPIDA) ---
             self.log("1. Analisando Modelo...")
             placeholders = reader.extrair_placeholders_modelo(self.path_modelo.get())
             
-            # Inicializa vazio
             dados_auto = {}
-
-            # SÓ TENTA LER SE O USUÁRIO SELECIONOU O ARQUIVO
             path_sol = self.path_solicitante.get()
             if path_sol:
                 self.log("2. Lendo dados do Solicitante...")
@@ -158,7 +162,6 @@ class GeradorPropostasApp:
             else:
                 self.log("2. Ficha Solicitante não informada. Preenchimento manual...")
 
-            # Faturamento 
             path_fat = self.path_faturamento.get()
             if path_fat:
                 self.log("Lendo dados de Faturamento...")
@@ -166,47 +169,92 @@ class GeradorPropostasApp:
                 dados_fat = parser.processar_dados(placeholders, txt_fat, sufixo_filtro="_CONTRATANTE")
                 dados_auto.update(dados_fat)
 
-            # --- PASSO 1: REVISÃO ---
+            # --- ETAPAS VISUAIS (JANELAS) ---
             self.log("3. Revisão (Passo 1/3)...")
             dados_revisados = janela_verificacao_unificada(self.root, placeholders, dados_auto)
-            
-            # VERIFICAÇÃO 1: Se fechou a janela de revisão
             if not dados_revisados:
                 messagebox.showinfo("Cancelado", "Operação cancelada na etapa de Revisão.")
-                self.log("Processo cancelado pelo usuário.")
                 return
 
-            # --- PASSO 2: ESTRUTURAL ---
             self.log("4. Estrutural (Passo 2/3)...")
             dados_com_estrutural = janela_projeto_estrutural(self.root, dados_revisados)
-            
-            # VERIFICAÇÃO 2: Se fechou a janela estrutural (não salvou a chave ITENS_ESTRUTURAL)
             if "ITENS_ESTRUTURAL" not in dados_com_estrutural:
-                messagebox.showinfo("Cancelado", "Operação cancelada na etapa de Escopo Estrutural.")
-                self.log("Processo cancelado pelo usuário.")
+                messagebox.showinfo("Cancelado", "Operação cancelada na etapa estrutural.")
                 return
 
-            # --- PASSO 3: ORÇAMENTO ---
             self.log("5. Orçamento (Passo 3/3)...")
             dados_finais = janela_itens_orcamento(self.root, dados_com_estrutural)
-            
-            # VERIFICAÇÃO 3: Se fechou a janela de orçamento (não salvou a chave ITENS_ORCAMENTO)
             if "ITENS_ORCAMENTO" not in dados_finais:
-                messagebox.showinfo("Cancelado", "Operação cancelada na etapa de Orçamento.")
-                self.log("Processo cancelado pelo usuário.")
+                messagebox.showinfo("Cancelado", "Operação cancelada na etapa de orçamento.")
                 return
 
-            # --- FINALIZAÇÃO ---
+            # Data final
             agora = datetime.now()
             meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
             dados_finais["DATA_HOJE"] = f"{agora.day} de {meses[agora.month - 1]} de {agora.year}"
             
-            self.log("6. Gerando arquivos...")
-            docx, pdf = generator.gerar_arquivos(self.path_modelo.get(), dados_finais, self.path_saida.get())
+            # --- FASE DE GERAÇÃO (COM PORCENTAGEM) ---
+            self.log("6. Iniciando geração...")
             
-            messagebox.showinfo("Sucesso", f"Arquivos gerados com sucesso!")
-            self.log("Concluído.")
+            # Mostra a barra e o texto
+            self.lbl_progresso.configure(text="0% - Iniciando...")
+            self.lbl_progresso.pack(before=self.log_text, pady=(0, 5))
+            self.bar_progresso.pack(before=self.log_text, fill="x", padx=50, pady=(0, 20))
+            
+            self.bar_progresso.set(0)
+            self.btn_processar.configure(state="disabled") 
+
+            # --- FUNÇÃO QUE O GERADOR VAI CHAMAR ---
+            def atualizar_gui(pct, mensagem):
+                # O CustomTkinter espera valor entre 0.0 e 1.0
+                valor_float = pct / 100
+                self.bar_progresso.set(valor_float)
+                self.lbl_progresso.configure(text=f"{pct}% - {mensagem}")
+                # Força atualização visual
+                self.root.update_idletasks()
+
+            def tarefa_pesada():
+                try:
+                    # Passamos a função 'atualizar_gui' para dentro do gerador!
+                    generator.gerar_arquivos(
+                        self.path_modelo.get(), 
+                        dados_finais, 
+                        self.path_saida.get(),
+                        callback_progresso=atualizar_gui  # <--- AQUI É O PULO DO GATO
+                    )
+                    self.root.after(0, finalizar_sucesso)
+                except Exception as e:
+                    self.root.after(0, lambda: finalizar_erro(str(e)))
+
+            def finalizar_sucesso():
+                # Esconde a barra depois de um tempo ou deixa lá cheia
+                self.lbl_progresso.configure(text="100% - Concluído!")
+                self.bar_progresso.set(1)
+                self.btn_processar.configure(state="normal")
+                self.log("Concluído com sucesso.")
+                messagebox.showinfo("Sucesso", "Arquivos gerados com sucesso!")
+                
+                # Opcional: Esconder depois de 2 segundos
+                self.root.after(2000, lambda: self.bar_progresso.pack_forget())
+                self.root.after(2000, lambda: self.lbl_progresso.pack_forget())
+
+            def finalizar_erro(msg_erro):
+                self.lbl_progresso.configure(text="Erro!")
+                self.bar_progresso.pack_forget()
+                self.lbl_progresso.pack_forget()
+                self.btn_processar.configure(state="normal")
+                self.log(f"ERRO: {msg_erro}")
+                messagebox.showerror("Erro", msg_erro)
+
+            threading.Thread(target=tarefa_pesada, daemon=True).start()
 
         except Exception as e:
+            self.log(f"ERRO GERAL: {e}")
+            messagebox.showerror("Erro", str(e))
+
+        except Exception as e:
+            self.bar_progresso.stop()
+            self.bar_progresso.pack_forget()
+        
             self.log(f"ERRO: {e}")
             messagebox.showerror("Erro", str(e))
