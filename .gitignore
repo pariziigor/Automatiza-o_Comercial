@@ -4,9 +4,12 @@ env/
 __pycache__/
 *.pyc
 templates/
+build/
+dist/
 
 # Arquivos de sistema
 .DS_Store
 Thumbs.db
 config.json
 icone.ico
+*.spec
