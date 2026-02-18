@@ -9,7 +9,6 @@ def aplicar_estilo_tabela():
     style = ttk.Style()
     style.theme_use("default")
     
-    # Cores do Modo Escuro
     bg_color = "#2b2b2b"
     text_color = "white"
     selected_color = "#1f538d"
@@ -26,8 +25,7 @@ def aplicar_estilo_tabela():
                     foreground="white",
                     relief="flat")
     
-    style.map("Treeview",
-              background=[("selected", selected_color)])
+    style.map("Treeview", background=[("selected", selected_color)])
 
 # --- JANELA 1: REVISÃO DE DADOS ---
 def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
@@ -35,12 +33,14 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
     win.title("Conferência Geral dos Dados")
     win.geometry("950x750")
     
-    # --- CORREÇÃO DE JANELA (MODAL) ---
-    win.transient(parent) # Faz a janela "flutuar" sempre em cima da principal
-    win.grab_set()        # Bloqueia cliques na janela principal
-    win.lift()            # Traz para frente
-    win.focus_force()     # Força o foco
+    win.transient(parent)
+    win.grab_set()
+    win.lift()
+    win.focus_force()
     
+    # Variável de controle de cancelamento
+    status = {"confirmado": False}
+
     resultado_final = {}
     widgets_texto = {}
     widgets_servicos = {}
@@ -105,7 +105,7 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
         def task():
             try:
                 url = f"https://www.receitaws.com.br/v1/cnpj/{cnpj_limpo}"
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                headers = {'User-Agent': 'Mozilla/5.0'}
                 response = requests.get(url, headers=headers, timeout=10)
                 
                 if response.status_code == 200:
@@ -135,15 +135,12 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
                         count_preenchidos = 0
                         for campo_word, entry_widget in widgets_texto.items():
                             campo_upper = campo_word.upper()
+                            if contexto == "FATURAMENTO" and "CONTRATANTE" not in campo_upper: continue
                             
-                            if contexto == "FATURAMENTO":
-                                if "CONTRATANTE" not in campo_upper: continue
-                            
-                            if "ENDERECO" in campo_upper:
-                                if "OBRA" not in campo_upper and "ENTREGA" not in campo_upper:
-                                    entry_widget.delete(0, "end")
-                                    entry_widget.insert(0, endereco_full)
-                                    count_preenchidos += 1
+                            if "ENDERECO" in campo_upper and "OBRA" not in campo_upper and "ENTREGA" not in campo_upper:
+                                entry_widget.delete(0, "end")
+                                entry_widget.insert(0, endereco_full)
+                                count_preenchidos += 1
                                 continue
 
                             for chave_api, lista_possiveis in mapeamento.items():
@@ -161,17 +158,15 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
 
                     win.after(0, atualizar_gui)
                 else:
-                    win.after(0, lambda: messagebox.showerror("Erro", f"Erro no servidor: Código {response.status_code}"))
+                    win.after(0, lambda: messagebox.showerror("Erro", f"Erro API: {response.status_code}"))
             except Exception as e:
-                win.after(0, lambda: messagebox.showerror("Erro de Conexão", f"Falha ao buscar dados:\n{str(e)}"))
+                win.after(0, lambda: messagebox.showerror("Erro", str(e)))
 
         threading.Thread(target=task, daemon=True).start()
 
-    # --- DESENHAR CAMPOS ---
     def desenhar_campos(lista, titulo):
         if not lista: return
         add_section_title(titulo)
-        
         f_campos = ctk.CTkFrame(scroll_frame, fg_color="transparent")
         f_campos.pack(fill="x", pady=5)
         f_campos.grid_columnconfigure(1, weight=1) 
@@ -201,7 +196,6 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
             valor_auto = dados_extraidos.get(campo, "")
             chave_limpa = campo.replace("_SOLICITANTE", "").replace("_CONTRATANTE", "")
             texto_label = mapa_nomes.get(chave_limpa, chave_limpa.replace("_", " ").title())
-            
             row = i // 2
             col_start = (i % 2) * 2 
             
@@ -213,7 +207,6 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
                 ent = ctk.CTkEntry(f_cnpj)
                 if valor_auto: ent.insert(0, valor_auto)
                 ent.pack(side="left", fill="x", expand=True)
-                
                 tipo_busca = "FATURAMENTO" if "CONTRATANTE" in campo.upper() else "SOLICITANTE"
                 ctk.CTkButton(f_cnpj, text="🔍", width=40, command=lambda e=ent, t=tipo_busca: buscar_cnpj_api(e, t)).pack(side="right", padx=(5, 0))
                 widgets_texto[campo] = ent
@@ -228,13 +221,18 @@ def janela_verificacao_unificada(parent, todos_placeholders, dados_extraidos):
     desenhar_campos(grupo_contratante, "5. DADOS DE FATURAMENTO")
 
     def confirmar():
+        status["confirmado"] = True
         resultado_final["TIPO_FRETE"] = var_frete.get()
         for k, chk in widgets_servicos.items(): resultado_final[k] = "X" if chk.get() == 1 else "" 
         for k, entry in widgets_texto.items(): resultado_final[k] = entry.get()
         win.destroy()
 
     ctk.CTkButton(win, text="CONFIRMAR E CONTINUAR", command=confirmar, height=50, fg_color="green", hover_color="darkgreen").pack(fill="x", padx=20, pady=20)
+    
     parent.wait_window(win)
+    
+    if not status["confirmado"]:
+        return None  # Retorna None se fechou no X
     return resultado_final
 
 # --- JANELA 2: ESCOPO ESTRUTURAL ---
@@ -243,12 +241,12 @@ def janela_projeto_estrutural(parent, dados_anteriores):
     win.title("Passo 2: Escopo Estrutural")
     win.geometry("900x700")
     
-    # --- CORREÇÃO DE JANELA (MODAL) ---
     win.transient(parent)
     win.grab_set()
     win.lift()
     win.focus_force()
 
+    status = {"confirmado": False}
     lista_itens_estrutural = []
     aplicar_estilo_tabela()
 
@@ -295,6 +293,7 @@ def janela_projeto_estrutural(parent, dados_anteriores):
             tree.delete(item_id)
 
     def finalizar():
+        status["confirmado"] = True
         dados_anteriores["ITENS_ESTRUTURAL"] = lista_itens_estrutural
         win.destroy()
 
@@ -305,6 +304,9 @@ def janela_projeto_estrutural(parent, dados_anteriores):
     ctk.CTkButton(f_footer, text="CONCLUIR", command=finalizar, fg_color="green", hover_color="darkgreen").pack(side="right")
 
     parent.wait_window(win)
+    
+    if not status["confirmado"]:
+        return None
     return dados_anteriores
 
 # --- JANELA 3: ORÇAMENTO ---
@@ -313,28 +315,43 @@ def janela_itens_orcamento(parent, dados_anteriores):
     win.title("Passo 3: Orçamento")
     win.geometry("900x700")
     
-    # --- CORREÇÃO DE JANELA (MODAL) ---
     win.transient(parent)
     win.grab_set()
     win.lift()
     win.focus_force()
 
+    status = {"confirmado": False}
     lista_itens = []
     total_geral_float = 0.0
     aplicar_estilo_tabela()
 
     ctk.CTkLabel(win, text="Composição do Orçamento", font=("Roboto", 20, "bold")).pack(pady=(20, 10))
+    
     f_input = ctk.CTkFrame(win)
     f_input.pack(fill="x", padx=20, pady=10)
     f_input.grid_columnconfigure(0, weight=1)
 
     ctk.CTkLabel(f_input, text="Descrição:").grid(row=0, column=0, sticky="w", padx=10, pady=(10,0))
     ctk.CTkLabel(f_input, text="Valor (R$):").grid(row=0, column=1, sticky="w", padx=10, pady=(10,0))
+    
     entry_desc = ctk.CTkEntry(f_input)
     entry_desc.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+    
     entry_valor = ctk.CTkEntry(f_input, width=150)
     entry_valor.grid(row=1, column=1, sticky="ew", padx=10, pady=(0, 10))
-    
+    entry_valor.insert(0, "0,00")
+
+    def formatar_moeda_ao_digitar(event):
+        valor_atual = entry_valor.get()
+        apenas_numeros = "".join(filter(str.isdigit, valor_atual))
+        if not apenas_numeros: apenas_numeros = "0"
+        valor_float = int(apenas_numeros) / 100
+        formatado = f"{valor_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        entry_valor.delete(0, "end")
+        entry_valor.insert(0, formatado)
+
+    entry_valor.bind("<KeyRelease>", formatar_moeda_ao_digitar)
+
     f_lista = ctk.CTkFrame(win, fg_color="transparent")
     f_lista.pack(fill="both", expand=True, padx=20, pady=5)
 
@@ -353,27 +370,33 @@ def janela_itens_orcamento(parent, dados_anteriores):
     lbl_total = ctk.CTkLabel(win, text="TOTAL GERAL: R$ 0,00", font=("Roboto", 24, "bold"), text_color="green")
     lbl_total.pack(pady=10)
 
-    def formatar_moeda(valor_float):
+    def formatar_moeda_exibicao(valor_float):
         return f"R$ {valor_float:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     def converter_brl_para_float(texto):
-        try: return float(texto.replace("R$", "").replace(" ", "").replace(".", "").replace(",", "."))
+        limpo = texto.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+        try: return float(limpo)
         except: return 0.0
 
     def adicionar_item():
         nonlocal total_geral_float
-        desc, valor_txt = entry_desc.get().strip(), entry_valor.get().strip()
-        if not desc or not valor_txt: return
+        desc = entry_desc.get().strip()
+        valor_txt = entry_valor.get().strip()
+        if not desc: return
         try:
             valor_float = converter_brl_para_float(valor_txt)
-            tree.insert("", "end", values=(desc, formatar_moeda(valor_float)))
-            lista_itens.append({"descricao": desc, "valor": formatar_moeda(valor_float)})
+            if valor_float <= 0:
+                messagebox.showwarning("Atenção", "O valor deve ser maior que zero.")
+                return
+            tree.insert("", "end", values=(desc, formatar_moeda_exibicao(valor_float)))
+            lista_itens.append({"descricao": desc, "valor": formatar_moeda_exibicao(valor_float)})
             total_geral_float += valor_float
-            lbl_total.configure(text=f"TOTAL GERAL: {formatar_moeda(total_geral_float)}")
+            lbl_total.configure(text=f"TOTAL GERAL: {formatar_moeda_exibicao(total_geral_float)}")
             entry_desc.delete(0, "end")
             entry_valor.delete(0, "end")
+            entry_valor.insert(0, "0,00")
             entry_desc.focus()
-        except: messagebox.showerror("Erro", "Valor inválido.")
+        except Exception as e: messagebox.showerror("Erro", f"Valor inválido: {e}")
 
     def remover_item():
         nonlocal total_geral_float
@@ -387,11 +410,12 @@ def janela_itens_orcamento(parent, dados_anteriores):
             val_float = converter_brl_para_float(str(vals[1]))
             lista_itens.append({"descricao": vals[0], "valor": vals[1]})
             total_geral_float += val_float
-        lbl_total.configure(text=f"TOTAL GERAL: {formatar_moeda(total_geral_float)}")
+        lbl_total.configure(text=f"TOTAL GERAL: {formatar_moeda_exibicao(total_geral_float)}")
 
     def finalizar():
+        status["confirmado"] = True
         dados_anteriores["ITENS_ORCAMENTO"] = lista_itens
-        dados_anteriores["VALOR_TOTAL_PROPOSTA"] = formatar_moeda(total_geral_float)
+        dados_anteriores["VALOR_TOTAL_PROPOSTA"] = formatar_moeda_exibicao(total_geral_float)
         win.destroy()
 
     ctk.CTkButton(f_input, text="Adicionar (+)", command=adicionar_item, width=120).grid(row=1, column=2, padx=10, pady=(0, 10))
@@ -401,4 +425,7 @@ def janela_itens_orcamento(parent, dados_anteriores):
     ctk.CTkButton(f_footer, text="GERAR PROPOSTA", command=finalizar, fg_color="green", hover_color="darkgreen", height=40).pack(side="right", fill="x", expand=True, padx=(20, 0))
 
     parent.wait_window(win)
+    
+    if not status["confirmado"]:
+        return None
     return dados_anteriores
