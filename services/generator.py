@@ -19,13 +19,13 @@ def gerar_arquivos(path_modelo, dados, pasta_saida, callback_progresso=None):
 
     reportar(30, "Processando dados...")
     
-    # Não podemos converter LISTAS para STRING, senão o Word soletra letra por letra.
+    # Não pode converter LISTAS para STRING, senão o Word soletra letra por letra
     dados_limpos = {}
     for chave, valor in dados.items():
         if valor is None:
             dados_limpos[chave] = ""
         elif isinstance(valor, list):
-            # Se for lista (Orçamento ou Estrutural), mantém como lista!
+            # Se for lista (Orçamento ou Estrutural), mantém como lista
             dados_limpos[chave] = valor
         else:
             # Se for texto ou número, converte para string segura
